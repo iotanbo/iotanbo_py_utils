@@ -7,23 +7,35 @@ import urllib.request
 from pathlib import Path
 from urllib import error
 
-# import symlink
+# from iotanbo_py_utils.error import ErrorMsg, IotanboError
 
 
 def file_exists(path_to_file) -> bool:
     """
     True if file exists, false otherwise (or if it is a directory).
     """
-    if os.path.isdir(path_to_file):
-        return False
-    return os.path.exists(path_to_file)
+    result = False
+    try:
+        result = os.path.isdir(path_to_file)
+        if result:
+            return False
+        result = os.path.exists(path_to_file)
+    except Exception:
+        pass
+
+    return result
 
 
 def dir_exists(path_to_dir) -> bool:
     """
     True if directory exists, false otherwise (or if it is a file).
     """
-    return os.path.isdir(path_to_dir)
+    result = False
+    try:
+        result = os.path.isdir(path_to_dir)
+    except Exception:
+        pass
+    return result
 
 
 def create_symlink_noexcept(src, dest) -> dict:
@@ -360,6 +372,10 @@ def get_item_type(path) -> dict:
 
 def get_user_home_dir() -> str:
     return str(Path.home())
+
+
+def get_cwd() -> str:
+    return os.getcwd()
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Environment variables

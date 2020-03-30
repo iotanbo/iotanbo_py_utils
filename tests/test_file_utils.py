@@ -2,6 +2,8 @@ import pytest
 
 from iotanbo_py_utils import file_utils
 
+# from iotanbo_py_utils.error import ErrorMsg, IotanboError
+
 
 @pytest.fixture(scope="session")
 def existing_dir(tmpdir_factory):

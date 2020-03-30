@@ -14,18 +14,13 @@ Why does this file exist, and why not put this in __main__?
 
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
-import sys
+
+import iotanbo_py_utils
 
 
-def main(argv=sys.argv):
+def main(*_, **__):
     """
-    Args:
-        argv (list): List of arguments
-
-    Returns:
-        int: A return code
-
-    Does stuff.
+    Report version
     """
-    print(argv)
+    print(f"iotanbo_py_utils version {iotanbo_py_utils.__version__}")
     return 0

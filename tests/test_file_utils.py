@@ -1,8 +1,7 @@
 import pytest
 
 from iotanbo_py_utils import file_utils
-
-# from iotanbo_py_utils.error import ErrorMsg, IotanboError
+from iotanbo_py_utils.error import IotanboError
 
 
 @pytest.fixture(scope="session")
@@ -15,8 +14,8 @@ def existing_dir(tmpdir_factory):
 @pytest.fixture(scope="session")
 def existing_text_file(existing_dir):
     ef = existing_dir.join("existing_file.txt")
-    result = file_utils.write_text_file_noexcept(ef, "test")
-    assert not result["error"]
+    _, err = file_utils.write_text_file_ne(ef, "test")
+    assert not err
     print("\n*** Created temporary text file for current session: ", ef)
     return ef
 
@@ -24,7 +23,8 @@ def existing_text_file(existing_dir):
 @pytest.fixture(scope="session")
 def existing_text_file_symlink(existing_dir, existing_text_file):
     es = existing_dir + "/existing_text_file_symlink.txt"
-    assert not file_utils.create_symlink_noexcept(existing_text_file, es)["error"]
+    _, err = file_utils.create_symlink_ne(existing_text_file, es)
+    assert not err
     print("\n*** Created temporary symlink for current session: ", es)
     return es
 
@@ -39,34 +39,72 @@ def not_existing_file():
     return "/tmp/this_file_does_not_exist"
 
 
+def test_file_exists_ne(existing_text_file, not_existing_file):
+    assert file_utils.file_exists_ne(existing_text_file)
+    assert not file_utils.file_exists_ne(not_existing_file)
+    # Sad path:
+    # Bad parameter test
+    assert not file_utils.file_exists_ne(None)
+    assert not file_utils.file_exists_ne({"Dummy": "dict"})
+
+
 def test_file_exists(existing_text_file, not_existing_file):
     assert file_utils.file_exists(existing_text_file)
     assert not file_utils.file_exists(not_existing_file)
+    # Sad path:
+    # Bad parameter test
+    with pytest.raises(IotanboError):
+        file_utils.file_exists(None)
+    with pytest.raises(IotanboError):
+        file_utils.file_exists({"Dummy": "dict"})
 
 
-def test_dir_exists(existing_dir, not_existing_dir):
+def test_dir_exists_ne(existing_dir, not_existing_dir, existing_text_file):
+    assert file_utils.dir_exists_ne(existing_dir)
+    assert not file_utils.dir_exists_ne(not_existing_dir)
+    # Sad path:
+    # File instead of dir
+    assert not file_utils.dir_exists_ne(existing_text_file)
+    # Bad parameter test
+    assert not file_utils.dir_exists_ne(None)
+    assert not file_utils.dir_exists_ne({"Dummy": "dict"})
+
+
+def test_dir_exists(existing_dir, not_existing_dir, existing_text_file):
     assert file_utils.dir_exists(existing_dir)
     assert not file_utils.dir_exists(not_existing_dir)
+    # Sad path:
+    # File instead of dir
+    assert not file_utils.dir_exists(existing_text_file)
+    # with pytest.raises(IotanboError):
+    #     file_utils.dir_exists(existing_text_file)
+    # Bad parameter test
+    with pytest.raises(IotanboError):
+        file_utils.dir_exists(None)
+    with pytest.raises(IotanboError):
+        file_utils.dir_exists({"Dummy": "dict"})
 
 
 def test_symlink_exists(existing_text_file_symlink):
-    assert file_utils.symlink_exists(existing_text_file_symlink)
+    assert file_utils.symlink_exists_ne(existing_text_file_symlink)
 
 
-def test_create_remove_symlink_noexcept(existing_text_file, existing_dir):
+def test_create_remove_symlink_ne(existing_text_file, existing_dir):
     # Create and remove symlink to file
     text_file_symlink = existing_dir + "/file_symlink.txt"
-    assert not file_utils.create_symlink_noexcept(existing_text_file, text_file_symlink)["error"]
-    assert file_utils.symlink_exists(text_file_symlink)
-    assert file_utils.remove_symlink_noexcept(text_file_symlink)
-    assert not file_utils.symlink_exists(text_file_symlink)
+    _, err = file_utils.create_symlink_ne(existing_text_file, text_file_symlink)
+    assert not err
+    assert file_utils.symlink_exists_ne(text_file_symlink)
+    assert file_utils.remove_symlink_ne(text_file_symlink)
+    assert not file_utils.symlink_exists_ne(text_file_symlink)
 
     # Create and remove symlink to dir
     dir_symlink = existing_dir + "/symlink_to_parent_dir"
-    assert file_utils.create_symlink_noexcept(existing_dir, dir_symlink)
-    assert file_utils.symlink_exists(dir_symlink)
-    assert file_utils.remove_symlink_noexcept(dir_symlink)
-    assert not file_utils.symlink_exists(dir_symlink)
+    _, err = file_utils.create_symlink_ne(existing_dir, dir_symlink)
+    assert not err
+    assert file_utils.symlink_exists_ne(dir_symlink)
+    assert file_utils.remove_symlink_ne(dir_symlink)
+    assert not file_utils.symlink_exists_ne(dir_symlink)
 
 
 def test_path_base_and_leaf():
@@ -81,114 +119,123 @@ def test_path_base_and_leaf():
     assert leaf == "leaf"
 
 
-def test_read_write_text_file_noexcept(existing_dir):
+def test_read_write_text_file_ne(existing_dir):
     tmpfile = existing_dir + "/tmpfile.txt"
-    assert not file_utils.write_text_file_noexcept(tmpfile, "test")["error"]
-    read_result = file_utils.read_text_file_noexcept(tmpfile)
-    assert not read_result["error"]
-    assert read_result["contents"] == "test"
-    file_utils.remove_file_noexcept(tmpfile)
+    _, err = file_utils.write_text_file_ne(tmpfile, "test")
+    assert not err
+    contents, err = file_utils.read_text_file_ne(tmpfile)
+    assert not err
+    assert contents == "test"
+    file_utils.remove_file_ne(tmpfile)
 
 
-def test_create_path_noexcept(existing_dir):
+def test_create_path_ne(existing_dir):
     path = existing_dir + "/some/complicated/path"
-    assert not file_utils.create_path_noexcept(path)["error"]
-    assert not file_utils.remove_dir_noexcept(existing_dir + "/some")["error"]
+    _, err = file_utils.create_path_ne(path)
+    assert not err
+    assert not file_utils.remove_dir_ne(existing_dir + "/some")[1]
 
 
-def test_copy_file_noexcept(existing_dir, existing_text_file):
+def test_copy_file_ne(existing_dir, existing_text_file):
     dest = existing_dir + "/existing_text_file_copy.txt"
-    assert not file_utils.copy_file_noexcept(existing_text_file, dest)["error"]
+    _, err = file_utils.copy_file_ne(existing_text_file, dest)
+    assert not err
     # Read created copy to verify its contents
-    assert "test" == file_utils.read_text_file_noexcept(dest)["contents"]
+    contents, err = file_utils.read_text_file_ne(dest)
+    assert contents == "test"
     # Remove created copy
-    assert not file_utils.remove_file_noexcept(dest)["error"]
+    assert not file_utils.remove_file_ne(dest)[1]
 
 
-def test_move_file_noexcept(existing_dir):
+def test_move_file_ne(existing_dir):
     # Create temp file
     orig_file = existing_dir + "move_file_test.txt"
     dest = existing_dir + "moved_file.txt"
     contents = "move_file_test.txt"
-    assert not file_utils.write_text_file_noexcept(orig_file,
-                                                   contents)["error"]
+    _, err = file_utils.write_text_file_ne(orig_file, contents)
+    assert not err
     # Move it
-    assert not file_utils.move_file_noexcept(orig_file, dest)["error"]
+    _, err = file_utils.move_file_ne(orig_file, dest)
+    assert not err
     # Assert original file not exists
-    assert not file_utils.file_exists(orig_file)
+    assert not file_utils.file_exists_ne(orig_file)
     # Assert moved file exists and has correct contents
-    assert file_utils.file_exists(dest)
-    assert contents == file_utils.read_text_file_noexcept(dest)["contents"]
+    assert file_utils.file_exists_ne(dest)
+    file_contents, err = file_utils.read_text_file_ne(dest)
+    assert contents == file_contents
     # Remove temp file
-    assert file_utils.remove_file_noexcept(dest)
+    assert file_utils.remove_file_ne(dest)
 
 
-def test_copy_dir_noexcept(existing_dir):
+def test_copy_dir_ne(existing_dir):
     # Create path
     orig_path = existing_dir + "/copy/dir/test"
-    assert not file_utils.create_path_noexcept(orig_path)["error"]
+    _, err = file_utils.create_path_ne(orig_path)
+    assert not err
     src = existing_dir + "/copy"
     dest = existing_dir + "/dest"
     # Copy tree
-    assert not file_utils.copy_dir_noexcept(src, dest)["error"]
+    assert not file_utils.copy_dir_ne(src, dest)[1]
     # Assert both exist
-    assert file_utils.dir_exists(orig_path)
-    assert file_utils.dir_exists(dest + "/dir/test")
+    assert file_utils.dir_exists_ne(orig_path)
+    assert file_utils.dir_exists_ne(dest + "/dir/test")
     # Remove src and dest
-    assert not file_utils.remove_dir_noexcept(src)["error"]
-    assert not file_utils.remove_dir_noexcept(dest)["error"]
+    assert not file_utils.remove_dir_ne(src)[1]
+    assert not file_utils.remove_dir_ne(dest)[1]
 
 
-def test_move_dir_noexcept(existing_dir):
+def test_move_dir_ne(existing_dir):
     # Create path
     orig_path = existing_dir + "/move/dir/test"
-    assert not file_utils.create_path_noexcept(orig_path)["error"]
+    _, err = file_utils.create_path_ne(orig_path)
+    assert not err
     src = existing_dir + "/move"
     dest = existing_dir + "/dest"
     # Copy tree
-    assert not file_utils.move_dir_noexcept(src, dest)["error"]
+    _, err = file_utils.move_dir_ne(src, dest)
+    assert not err
     # Assert only dest exists
-    assert not file_utils.dir_exists(orig_path)
-    assert file_utils.dir_exists(dest + "/dir/test")
+    assert not file_utils.dir_exists_ne(orig_path)
+    assert file_utils.dir_exists_ne(dest + "/dir/test")
     # Remove dest
-    assert not file_utils.remove_dir_noexcept(dest)["error"]
+    _, err = file_utils.remove_dir_ne(dest)
+    assert not err
 
 
 def test_get_subdirs(existing_dir):
     # Create path
     path1 = existing_dir + "/subdirs/test1/test1_1"
-    assert not file_utils.create_path_noexcept(path1)["error"]
+    assert not file_utils.create_path_ne(path1)[1]
     path2 = existing_dir + "/subdirs/test2/test1_2"
-    assert not file_utils.create_path_noexcept(path2)["error"]
-    subdirs_result = file_utils.get_subdirs(existing_dir + "/subdirs")
+    assert not file_utils.create_path_ne(path2)[1]
+    subdirs_list, err = file_utils.get_subdirs_ne(existing_dir + "/subdirs")
     # There must be no error when getting subdirs
-    assert not subdirs_result['error']
-    subdirs = subdirs_result["subdirs"]
+    assert not err
     # There must be 2 subdirs, check their names
-    assert len(subdirs) == 2
-    assert "test1" in subdirs
-    assert "test2" in subdirs
+    assert len(subdirs_list) == 2
+    assert "test1" in subdirs_list
+    assert "test2" in subdirs_list
     # Cleanup
-    assert not file_utils.remove_dir_noexcept(existing_dir + "/subdirs")["error"]
+    assert not file_utils.remove_dir_ne(existing_dir + "/subdirs")[1]
 
 
 def test_get_file_list(existing_dir):
     # Create path
     path = existing_dir + "/file_list_test"
-    assert not file_utils.create_path_noexcept(path)["error"]
+    assert not file_utils.create_path_ne(path)[1]
     # Create a file, a dir and a symlink in that dir
-    file_utils.create_path_noexcept(path + "/test_dir")
-    file_utils.write_text_file_noexcept(path + "/test_file.txt", "test_file.txt")
-    file_utils.create_symlink_noexcept(path + "/test_file.txt", path + "/test_file_symlink.txt")
+    file_utils.create_path_ne(path + "/test_dir")
+    file_utils.write_text_file_ne(path + "/test_file.txt", "test_file.txt")
+    file_utils.create_symlink_ne(path + "/test_file.txt", path + "/test_file_symlink.txt")
     # Assert that only file is recognized as file
-    result = file_utils.get_file_list(path)
-    assert not result["error"]
-    assert len(result["file_list"]) == 2
-    assert "test_file.txt" in result["file_list"]
-    assert "test_file_symlink.txt" in result["file_list"]
+    file_list, err = file_utils.get_file_list_ne(path)
+    assert not err
+    assert len(file_list) == 2
+    assert "test_file.txt" in file_list
+    assert "test_file_symlink.txt" in file_list
 
     # Cleanup
-    file_utils.remove_dir_noexcept(path)
+    file_utils.remove_dir_ne(path)
 
 
 def test_get_total_items(existing_dir):
@@ -200,26 +247,26 @@ def test_get_total_items(existing_dir):
     """
     # Create path
     path = existing_dir + "/get_total_items_test"
-    assert not file_utils.create_path_noexcept(path)["error"]
+    assert not file_utils.create_path_ne(path)[1]
     # Create a file, a dir and a symlink in that dir
-    file_utils.create_path_noexcept(path + "/test_dir")
-    file_utils.write_text_file_noexcept(path + "/test_file.txt", "test_file.txt")
-    file_utils.create_symlink_noexcept(path + "/test_file.txt", path + "/test_file_symlink.txt")
+    file_utils.create_path_ne(path + "/test_dir")
+    file_utils.write_text_file_ne(path + "/test_file.txt", "test_file.txt")
+    file_utils.create_symlink_ne(path + "/test_file.txt", path + "/test_file_symlink.txt")
     # Assert there are 3 items
-    result = file_utils.get_total_items(path)
-    assert not result["error"]
-    assert result["total_items"] == 3
+    total_items, err = file_utils.get_total_items_ne(path)
+    assert not err
+    assert total_items == 3
     # test_dir_empty test
     assert not file_utils.dir_empty(path)
     assert file_utils.dir_empty(path + "/not_exists")
     assert file_utils.dir_empty(path + "/test_dir")
     # get_item_type test
-    assert file_utils.get_item_type(path)["item_type"] == "dir"
-    assert file_utils.get_item_type(path + "/test_file.txt")["item_type"] == "file"
-    assert file_utils.get_item_type(path + "/test_file_symlink.txt")["item_type"] == "symlink"
-    assert not file_utils.get_item_type(path + "/not_exists")["item_type"]
+    assert file_utils.get_item_type_ne(path)[0] == "dir"
+    assert file_utils.get_item_type_ne(path + "/test_file.txt")[0] == "file"
+    assert file_utils.get_item_type_ne(path + "/test_file_symlink.txt")[0] == "symlink"
+    assert not file_utils.get_item_type_ne(path + "/not_exists")[0]
     # Cleanup
-    file_utils.remove_dir_noexcept(path)
+    file_utils.remove_dir_ne(path)
 
 
 def test_env_variables():
@@ -247,45 +294,44 @@ def test_tar_gz(existing_dir):
 
     # Create a directory with a text file
     path = existing_dir + "/tar_gz_test"
-    assert not file_utils.create_path_noexcept(path)["error"]
+    assert not file_utils.create_path_ne(path)[1]
     # Create a dir and a file
     src_dir = path + "/test_dir"
-    file_utils.create_path_noexcept(src_dir + "/inner_dir")
+    file_utils.create_path_ne(src_dir + "/inner_dir")
     src_file = src_dir + "/test_file.txt"
     src_file_contents = "test_file.txt"
-    file_utils.write_text_file_noexcept(src_file, src_file_contents)
+    file_utils.write_text_file_ne(src_file, src_file_contents)
 
     # Create .tar.gz archive from file
-    assert not file_utils.zip_file_tar_gz(src_file, path + "/result_file.tar.gz")["error"]
+    assert not file_utils.zip_file_tar_gz(src_file, path + "/result_file.tar.gz")[1]
 
     # Create .tar.gz archive from directory
-    assert not file_utils.zip_dir_tar_gz(src_dir, path + "/result_dir.tar.gz")["error"]
+    assert not file_utils.zip_dir_tar_gz(src_dir, path + "/result_dir.tar.gz")[1]
 
     # Unzip .tar.gz and verify contents
     assert not file_utils.unzip_tar_gz(path + "/result_file.tar.gz",
-                                       path + "/unzipped")["error"]
-    assert file_utils.file_exists(path + "/unzipped/test_file.txt")
-    assert file_utils.read_text_file_noexcept(path +
-                                              "/unzipped/test_file.txt")["contents"] \
-        == src_file_contents
+                                       path + "/unzipped")[1]
+    assert file_utils.file_exists_ne(path + "/unzipped/test_file.txt")
+
+    file_contents, err = file_utils.read_text_file_ne(path + "/unzipped/test_file.txt")
+    assert file_contents == src_file_contents
 
     # Unzip .tar.gz dir and verify contents
     assert not file_utils.unzip_tar_gz(path + "/result_dir.tar.gz",
-                                       path + "/unzipped")["error"]
-    assert file_utils.dir_exists(path + "/unzipped/test_dir")
-    assert file_utils.file_exists(path + "/unzipped/test_dir/test_file.txt")
-    assert file_utils.read_text_file_noexcept(path +
-                                              "/unzipped/test_dir/test_file.txt")["contents"] \
-        == src_file_contents
+                                       path + "/unzipped")[1]
+    assert file_utils.dir_exists_ne(path + "/unzipped/test_dir")
+    assert file_utils.file_exists_ne(path + "/unzipped/test_dir/test_file.txt")
+    file_contents, err = file_utils.read_text_file_ne(path + "/unzipped/test_dir/test_file.txt")
+    assert file_contents == src_file_contents
 
     # Cleanup
-    assert not file_utils.remove_dir_noexcept(existing_dir + "/tar_gz_test")["error"]
+    assert not file_utils.remove_dir_ne(existing_dir + "/tar_gz_test")[1]
 
 
 def test_get_user_home_dir():
     user_home_dir = file_utils.get_user_home_dir()
     # print(f"\nUser home dir: {user_home_dir}\n")
-    assert file_utils.dir_exists(user_home_dir)
+    assert file_utils.dir_exists_ne(user_home_dir)
 
 
 # This test requires internet access, so it is normally disabled
@@ -294,4 +340,4 @@ def test_get_user_home_dir():
 #     assert not file_utils.download_into_file("https://github.com/iotanbo/cpplibhub/blob/master/docs/GET_STARTED.md",
 #                                         dest_file)['error']
 #     # Cleanup
-#     file_utils.remove_file_noexcept(dest_file)
+#     file_utils.remove_file_ne(dest_file)

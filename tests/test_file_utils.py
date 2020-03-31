@@ -1,7 +1,8 @@
 import pytest
 
 from iotanbo_py_utils import file_utils
-from iotanbo_py_utils.error import IotanboError
+
+# from iotanbo_py_utils.error import IotanboError
 
 
 @pytest.fixture(scope="session")
@@ -48,15 +49,15 @@ def test_file_exists_ne(existing_text_file, not_existing_file):
     assert not file_utils.file_exists_ne({"Dummy": "dict"})
 
 
-def test_file_exists(existing_text_file, not_existing_file):
-    assert file_utils.file_exists(existing_text_file)
-    assert not file_utils.file_exists(not_existing_file)
-    # Sad path:
-    # Bad parameter test
-    with pytest.raises(IotanboError):
-        file_utils.file_exists(None)
-    with pytest.raises(IotanboError):
-        file_utils.file_exists({"Dummy": "dict"})
+# def test_file_exists(existing_text_file, not_existing_file):
+#     assert file_utils.file_exists(existing_text_file)
+#     assert not file_utils.file_exists(not_existing_file)
+#     # Sad path:
+#     # Bad parameter test
+#     with pytest.raises(IotanboError):
+#         file_utils.file_exists(None)
+#     with pytest.raises(IotanboError):
+#         file_utils.file_exists({"Dummy": "dict"})
 
 
 def test_dir_exists_ne(existing_dir, not_existing_dir, existing_text_file):
@@ -70,22 +71,22 @@ def test_dir_exists_ne(existing_dir, not_existing_dir, existing_text_file):
     assert not file_utils.dir_exists_ne({"Dummy": "dict"})
 
 
-def test_dir_exists(existing_dir, not_existing_dir, existing_text_file):
-    assert file_utils.dir_exists(existing_dir)
-    assert not file_utils.dir_exists(not_existing_dir)
-    # Sad path:
-    # File instead of dir
-    assert not file_utils.dir_exists(existing_text_file)
-    # with pytest.raises(IotanboError):
-    #     file_utils.dir_exists(existing_text_file)
-    # Bad parameter test
-    with pytest.raises(IotanboError):
-        file_utils.dir_exists(None)
-    with pytest.raises(IotanboError):
-        file_utils.dir_exists({"Dummy": "dict"})
+# def test_dir_exists(existing_dir, not_existing_dir, existing_text_file):
+#     assert file_utils.dir_exists(existing_dir)
+#     assert not file_utils.dir_exists(not_existing_dir)
+#     # Sad path:
+#     # File instead of dir
+#     assert not file_utils.dir_exists(existing_text_file)
+#     # with pytest.raises(IotanboError):
+#     #     file_utils.dir_exists(existing_text_file)
+#     # Bad parameter test
+#     with pytest.raises(IotanboError):
+#         file_utils.dir_exists(None)
+#     with pytest.raises(IotanboError):
+#         file_utils.dir_exists({"Dummy": "dict"})
 
 
-def test_symlink_exists(existing_text_file_symlink):
+def test_symlink_exists_ne(existing_text_file_symlink):
     assert file_utils.symlink_exists_ne(existing_text_file_symlink)
 
 
@@ -257,9 +258,9 @@ def test_get_total_items(existing_dir):
     assert not err
     assert total_items == 3
     # test_dir_empty test
-    assert not file_utils.dir_empty(path)
-    assert file_utils.dir_empty(path + "/not_exists")
-    assert file_utils.dir_empty(path + "/test_dir")
+    assert not file_utils.dir_empty_ne(path)
+    assert file_utils.dir_empty_ne(path + "/not_exists")
+    assert file_utils.dir_empty_ne(path + "/test_dir")
     # get_item_type test
     assert file_utils.get_item_type_ne(path)[0] == "dir"
     assert file_utils.get_item_type_ne(path + "/test_file.txt")[0] == "file"
@@ -334,10 +335,11 @@ def test_get_user_home_dir():
     assert file_utils.dir_exists_ne(user_home_dir)
 
 
-# This test requires internet access, so it is normally disabled
+# # This test requires internet access, so it is normally disabled
 # def test_download_into_file(existing_dir):
 #     dest_file = existing_dir + '/tmp.md'
-#     assert not file_utils.download_into_file("https://github.com/iotanbo/cpplibhub/blob/master/docs/GET_STARTED.md",
-#                                         dest_file)['error']
+#     header, err = file_utils.download_into_file("https://github.com/iotanbo/cpplibhub/blob/master/docs/GET_STARTED.md",
+#                                                 dest_file)
+#     assert not err
 #     # Cleanup
 #     file_utils.remove_file_ne(dest_file)

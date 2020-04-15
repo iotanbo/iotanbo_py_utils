@@ -1,5 +1,5 @@
 """
-Bump version and rebuild distribution
+Bump version, rebuild distribution or publish on pypi.org
 """
 import shutil
 import subprocess
@@ -17,7 +17,6 @@ def _print_usage_hint():
     print(f"    * publish on pypi.org: 'python3 versiontool.py publish'")
 
 
-
 def _remove_dir(path: str) -> None:
     try:
         shutil.rmtree(path)
@@ -28,7 +27,6 @@ def _remove_dir(path: str) -> None:
 def main():
     args = sys.argv
     if len(args) < 2:
-        print(args)
         _print_usage_hint()
         exit(0)
     cmd = args[1]
@@ -54,15 +52,13 @@ def main():
         exit(0)
     elif cmd == "publish":
         print("Publishing on pypi.org...")
-        subprocess.check_call(("twine", "upload", "dist"), env=dict(os.environ))
+        subprocess.check_call(("twine", "upload", "dist/*"), env=dict(os.environ))
         print("Done")
         exit(0)
     else:
         print(args)
         _print_usage_hint()
         exit(0)
-
-    # print(f"Removing old distribution...")
 
 
 if __name__ == '__main__':

@@ -1,8 +1,7 @@
 import pytest
 
 from iotanbo_py_utils import file_utils
-
-# from iotanbo_py_utils.error import IotanboError
+from iotanbo_py_utils.error import VAL, ERR
 
 
 @pytest.fixture(scope="session")
@@ -49,17 +48,6 @@ def test_file_exists_ne(existing_text_file, not_existing_file):
     assert not file_utils.file_exists_ne({"Dummy": "dict"})
 
 
-# def test_file_exists(existing_text_file, not_existing_file):
-#     assert file_utils.file_exists(existing_text_file)
-#     assert not file_utils.file_exists(not_existing_file)
-#     # Sad path:
-#     # Bad parameter test
-#     with pytest.raises(IotanboError):
-#         file_utils.file_exists(None)
-#     with pytest.raises(IotanboError):
-#         file_utils.file_exists({"Dummy": "dict"})
-
-
 def test_dir_exists_ne(existing_dir, not_existing_dir, existing_text_file):
     assert file_utils.dir_exists_ne(existing_dir)
     assert not file_utils.dir_exists_ne(not_existing_dir)
@@ -69,21 +57,6 @@ def test_dir_exists_ne(existing_dir, not_existing_dir, existing_text_file):
     # Bad parameter test
     assert not file_utils.dir_exists_ne(None)
     assert not file_utils.dir_exists_ne({"Dummy": "dict"})
-
-
-# def test_dir_exists(existing_dir, not_existing_dir, existing_text_file):
-#     assert file_utils.dir_exists(existing_dir)
-#     assert not file_utils.dir_exists(not_existing_dir)
-#     # Sad path:
-#     # File instead of dir
-#     assert not file_utils.dir_exists(existing_text_file)
-#     # with pytest.raises(IotanboError):
-#     #     file_utils.dir_exists(existing_text_file)
-#     # Bad parameter test
-#     with pytest.raises(IotanboError):
-#         file_utils.dir_exists(None)
-#     with pytest.raises(IotanboError):
-#         file_utils.dir_exists({"Dummy": "dict"})
 
 
 def test_symlink_exists_ne(existing_text_file_symlink):
@@ -134,7 +107,7 @@ def test_create_path_ne(existing_dir):
     path = existing_dir + "/some/complicated/path"
     _, err = file_utils.create_path_ne(path)
     assert not err
-    assert not file_utils.remove_dir_ne(existing_dir + "/some")[1]
+    assert not file_utils.remove_dir_ne(existing_dir + "/some")[ERR]
 
 
 def test_copy_file_ne(existing_dir, existing_text_file):
@@ -145,7 +118,7 @@ def test_copy_file_ne(existing_dir, existing_text_file):
     contents, err = file_utils.read_text_file_ne(dest)
     assert contents == "test"
     # Remove created copy
-    assert not file_utils.remove_file_ne(dest)[1]
+    assert not file_utils.remove_file_ne(dest)[ERR]
 
 
 def test_move_file_ne(existing_dir):
@@ -176,13 +149,13 @@ def test_copy_dir_ne(existing_dir):
     src = existing_dir + "/copy"
     dest = existing_dir + "/dest"
     # Copy tree
-    assert not file_utils.copy_dir_ne(src, dest)[1]
+    assert not file_utils.copy_dir_ne(src, dest)[ERR]
     # Assert both exist
     assert file_utils.dir_exists_ne(orig_path)
     assert file_utils.dir_exists_ne(dest + "/dir/test")
     # Remove src and dest
-    assert not file_utils.remove_dir_ne(src)[1]
-    assert not file_utils.remove_dir_ne(dest)[1]
+    assert not file_utils.remove_dir_ne(src)[ERR]
+    assert not file_utils.remove_dir_ne(dest)[ERR]
 
 
 def test_move_dir_ne(existing_dir):
@@ -206,9 +179,9 @@ def test_move_dir_ne(existing_dir):
 def test_get_subdirs(existing_dir):
     # Create path
     path1 = existing_dir + "/subdirs/test1/test1_1"
-    assert not file_utils.create_path_ne(path1)[1]
+    assert not file_utils.create_path_ne(path1)[ERR]
     path2 = existing_dir + "/subdirs/test2/test1_2"
-    assert not file_utils.create_path_ne(path2)[1]
+    assert not file_utils.create_path_ne(path2)[ERR]
     subdirs_list, err = file_utils.get_subdirs_ne(existing_dir + "/subdirs")
     # There must be no error when getting subdirs
     assert not err
@@ -217,13 +190,13 @@ def test_get_subdirs(existing_dir):
     assert "test1" in subdirs_list
     assert "test2" in subdirs_list
     # Cleanup
-    assert not file_utils.remove_dir_ne(existing_dir + "/subdirs")[1]
+    assert not file_utils.remove_dir_ne(existing_dir + "/subdirs")[ERR]
 
 
 def test_get_file_list(existing_dir):
     # Create path
     path = existing_dir + "/file_list_test"
-    assert not file_utils.create_path_ne(path)[1]
+    assert not file_utils.create_path_ne(path)[ERR]
     # Create a file, a dir and a symlink in that dir
     file_utils.create_path_ne(path + "/test_dir")
     file_utils.write_text_file_ne(path + "/test_file.txt", "test_file.txt")
@@ -248,7 +221,7 @@ def test_get_total_items(existing_dir):
     """
     # Create path
     path = existing_dir + "/get_total_items_test"
-    assert not file_utils.create_path_ne(path)[1]
+    assert not file_utils.create_path_ne(path)[ERR]
     # Create a file, a dir and a symlink in that dir
     file_utils.create_path_ne(path + "/test_dir")
     file_utils.write_text_file_ne(path + "/test_file.txt", "test_file.txt")
@@ -262,10 +235,10 @@ def test_get_total_items(existing_dir):
     assert file_utils.dir_empty_ne(path + "/not_exists")
     assert file_utils.dir_empty_ne(path + "/test_dir")
     # get_item_type test
-    assert file_utils.get_item_type_ne(path)[0] == "dir"
-    assert file_utils.get_item_type_ne(path + "/test_file.txt")[0] == "file"
-    assert file_utils.get_item_type_ne(path + "/test_file_symlink.txt")[0] == "symlink"
-    assert not file_utils.get_item_type_ne(path + "/not_exists")[0]
+    assert file_utils.get_item_type_ne(path)[VAL] == "dir"
+    assert file_utils.get_item_type_ne(path + "/test_file.txt")[VAL] == "file"
+    assert file_utils.get_item_type_ne(path + "/test_file_symlink.txt")[VAL] == "symlink"
+    assert not file_utils.get_item_type_ne(path + "/not_exists")[VAL]
     # Cleanup
     file_utils.remove_dir_ne(path)
 
@@ -295,7 +268,7 @@ def test_tar_gz(existing_dir):
 
     # Create a directory with a text file
     path = existing_dir + "/tar_gz_test"
-    assert not file_utils.create_path_ne(path)[1]
+    assert not file_utils.create_path_ne(path)[ERR]
     # Create a dir and a file
     src_dir = path + "/test_dir"
     file_utils.create_path_ne(src_dir + "/inner_dir")
@@ -304,14 +277,14 @@ def test_tar_gz(existing_dir):
     file_utils.write_text_file_ne(src_file, src_file_contents)
 
     # Create .tar.gz archive from file
-    assert not file_utils.zip_file_tar_gz(src_file, path + "/result_file.tar.gz")[1]
+    assert not file_utils.zip_file_tar_gz(src_file, path + "/result_file.tar.gz")[ERR]
 
     # Create .tar.gz archive from directory
-    assert not file_utils.zip_dir_tar_gz(src_dir, path + "/result_dir.tar.gz")[1]
+    assert not file_utils.zip_dir_tar_gz(src_dir, path + "/result_dir.tar.gz")[ERR]
 
     # Unzip .tar.gz and verify contents
     assert not file_utils.unzip_tar_gz(path + "/result_file.tar.gz",
-                                       path + "/unzipped")[1]
+                                       path + "/unzipped")[ERR]
     assert file_utils.file_exists_ne(path + "/unzipped/test_file.txt")
 
     file_contents, err = file_utils.read_text_file_ne(path + "/unzipped/test_file.txt")
@@ -319,14 +292,14 @@ def test_tar_gz(existing_dir):
 
     # Unzip .tar.gz dir and verify contents
     assert not file_utils.unzip_tar_gz(path + "/result_dir.tar.gz",
-                                       path + "/unzipped")[1]
+                                       path + "/unzipped")[ERR]
     assert file_utils.dir_exists_ne(path + "/unzipped/test_dir")
     assert file_utils.file_exists_ne(path + "/unzipped/test_dir/test_file.txt")
     file_contents, err = file_utils.read_text_file_ne(path + "/unzipped/test_dir/test_file.txt")
     assert file_contents == src_file_contents
 
     # Cleanup
-    assert not file_utils.remove_dir_ne(existing_dir + "/tar_gz_test")[1]
+    assert not file_utils.remove_dir_ne(existing_dir + "/tar_gz_test")[ERR]
 
 
 def test_get_user_home_dir():
@@ -338,7 +311,8 @@ def test_get_user_home_dir():
 # # This test requires internet access, so it is normally disabled
 # def test_download_into_file(existing_dir):
 #     dest_file = existing_dir + '/tmp.md'
-#     header, err = file_utils.download_into_file("https://github.com/iotanbo/cpplibhub/blob/master/docs/GET_STARTED.md",
+#     header, err = file_utils.download_into_file("https://github.com/iotanbo/
+#     cpplibhub/blob/master/docs/GET_STARTED.md",
 #                                                 dest_file)
 #     assert not err
 #     # Cleanup

@@ -288,14 +288,12 @@ def move_file_ne(origin: str, dest: str) -> ResultTuple:
     return None, ""
 
 
-def copy_dir_ne(origin, dest) -> ResultTuple:
+def copy_dir_ne(origin: str, dest: str) -> ResultTuple:
     """
-    Copy a directory and its contents (a tree) to a dest (do not raise exception).
+    Copy a directory and its contents (tree) to the dest, do not raise exception.
     If old 'dest' exists, it will be removed first.
     :param origin:
     :param dest:
-    :return: Dict:
-            ['error']: empty string if directory was copied and exists or error message otherwise;
     :return: ResultTuple: (None, ErrorMsg):
                          ErrorMsg: empty string if directory was copied
                          and exists or error message otherwise;

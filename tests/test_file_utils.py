@@ -1,7 +1,8 @@
 import pytest
 
 from iotanbo_py_utils import file_utils
-from iotanbo_py_utils.error import VAL, ERR
+from iotanbo_py_utils.error import ERR
+from iotanbo_py_utils.error import VAL
 
 
 @pytest.fixture(scope="session")

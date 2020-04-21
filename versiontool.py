@@ -1,10 +1,10 @@
 """
 Bump version, rebuild distribution or publish on pypi.org
 """
+import os
 import shutil
 import subprocess
 import sys
-import os
 
 
 def _print_usage_hint():

@@ -25,9 +25,9 @@ Overview
     :alt: Coverage Status
     :target: https://codecov.io/github/iotanbo/iotanbo_py_utils
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/iotanbo/iotanbo_py_utils/v0.0.3.svg
+.. |commits-since| image:: https://img.shields.io/github/commits-since/iotanbo/iotanbo_py_utils/v0.0.4.svg
     :alt: Commits since latest release
-    :target: https://github.com/iotanbo/iotanbo_py_utils/compare/v0.0.3...master
+    :target: https://github.com/iotanbo/iotanbo_py_utils/compare/v0.0.4...master
 
 
 

@@ -25,7 +25,7 @@ def read(*names, **kwargs):
 
 setup(
     name='iotanbo_py_utils',
-    version='0.0.4',
+    version='0.0.6',
     license='MIT',
     description='Python utility collection by iotanbo',
     long_description='%s\n%s' % (

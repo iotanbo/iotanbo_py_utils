@@ -52,4 +52,3 @@ class StrUtils:
         if strip_whitespace_after:
             text = text.strip()
         return text
-

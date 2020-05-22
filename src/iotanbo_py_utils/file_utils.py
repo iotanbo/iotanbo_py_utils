@@ -86,10 +86,7 @@ def create_symlink_ne(src: str, dest: str) -> ResultTuple:
     try:
         os.symlink(src, dest)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg
+        return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
@@ -117,18 +114,15 @@ def remove_symlink_ne(path: str) -> ResultTuple:
         try:
             os.unlink(path)
         except Exception as e:
-            msg = str(e)
-            if not msg:
-                msg = str(e.__class__.__name__)
-            return None, msg
+            return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
-def path_base_and_leaf(path: str) -> tuple:
+def path_base_and_leaf(path: str) -> (str, str):
     """
     Split path to a base part and a file or directory name, like in the following example:
-    path: '/a/b'; base: '/a'; leaf: 'b'
-    :except: IotanboError
+    path: '/a/b'; base: '/a'; leaf: 'b'. Return (base: str, leaf: str).
+    :raise: IotanboError
     """
     try:
         head, tail = ntpath.split(path)
@@ -139,7 +133,21 @@ def path_base_and_leaf(path: str) -> tuple:
         raise IotanboError(str(e)) from e
 
 
-def write_text_file_ne(filename: str, contents: str = '') -> ResultTuple:
+def path_base_and_leaf_ne(path: str) -> ResultTuple:
+    """
+    Split path to a base part and a file or directory name.
+    Return ResultTuple ((base: str, leaf: str), ErrorMsg)
+    """
+    try:
+        head, tail = ntpath.split(path)
+        if not tail:  # in case there is trailing slash at the end of path
+            return (ntpath.split(head)[0], ntpath.basename(head)), ""
+        return (head, tail), ""
+    except Exception as e:
+        return None, f"{e.__class__.__name__: {str(e)}}"
+
+
+def write_text_file_ne(filename: str, contents: str = '', encoding: str = "utf-8") -> ResultTuple:
     """
     Create a new text file and write contents into it (do not raise exceptions).
     If file with specified name already exists, it will be overwritten.
@@ -147,35 +155,52 @@ def write_text_file_ne(filename: str, contents: str = '') -> ResultTuple:
                          ErrorMsg: empty string if success, or error message otherwise.
     """
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w', encoding=encoding) as f:
             f.write(contents)
         return None, ""
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg
+        return None, f"{e.__class__.__name__}: {str(e)}"
 
 
-def read_text_file_ne(filename: str) -> ResultTuple:
+def read_text_file_ne(filename: str, encoding: str = "utf-8",) -> ResultTuple:
     """
     Read a text file (do not raise exceptions).
     :param filename: path to file
+    :param encoding: text file encoding ("utf-8" default)
 
     :return: ResultTuple: (Result, ErrorMsg):
                          Result: str - file contents if success;
                          ErrorMsg: str - empty string if success, or error message otherwise.
     """
+    result = ""
     if not file_exists_ne(filename):
-        return "", "file_not_exists"
+        return result, "file_not_exists"
     try:
-        with open(filename, 'r') as f:
+        with open(file=filename, mode='r', encoding=encoding) as f:
             return f.read(), ""
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return "", msg
+        return result, f"{e.__class__.__name__}: {str(e)}"
+
+
+def read_text_file_lines_ne(filename: str, encoding: str = "utf-8",
+                            line_sep: str = "\n") -> ResultTuple:
+    """
+    Read a text file (do not raise exceptions).
+
+    :param filename: path to file
+    :param encoding: text file encoding ("utf-8" default)
+    :param line_sep: line separator char(s)
+
+    :return: ResultTuple: (Result, ErrorMsg):
+                         Result: List[str] - list of lines if success;
+                         ErrorMsg: str - empty string if success, or error message otherwise.
+    """
+    result = []
+    contents, err = read_text_file_ne(filename, encoding=encoding)
+    if err:
+        return result, []
+    result = contents.split(sep=line_sep)
+    return result, ""
 
 
 def create_path_ne(path: str, overwrite=False) -> ResultTuple:
@@ -193,10 +218,7 @@ def create_path_ne(path: str, overwrite=False) -> ResultTuple:
             shutil.rmtree(path)
         os.makedirs(path)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg
+        return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
@@ -216,10 +238,7 @@ def remove_file_ne(path: str) -> ResultTuple:
         try:
             os.remove(path)
         except Exception as e:
-            msg = str(e)
-            if not msg:
-                msg = str(e.__class__.__name__)
-            return None, msg
+            return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
@@ -235,10 +254,7 @@ def remove_dir_ne(path) -> ResultTuple:
         try:
             shutil.rmtree(path)
         except Exception as e:
-            msg = str(e)
-            if not msg:
-                msg = str(e.__class__.__name__)
-            return None, msg
+            return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
@@ -258,10 +274,7 @@ def copy_file_ne(origin, dest) -> ResultTuple:
     try:
         shutil.copy(origin, dest)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg
+        return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
@@ -281,10 +294,7 @@ def move_file_ne(origin: str, dest: str) -> ResultTuple:
     try:
         shutil.move(origin, dest)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg
+        return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
@@ -298,17 +308,18 @@ def copy_dir_ne(origin: str, dest: str) -> ResultTuple:
                          ErrorMsg: empty string if directory was copied
                          and exists or error message otherwise;
     """
+
     if not dir_exists_ne(origin):
         return None, 'origin does not exist'
-    if remove_dir_ne(dest)[1]:
-        return None, "old directory can't be removed"
+
+    if dir_exists_ne(dest):
+        _, err = remove_dir_ne(dest)
+        if err:
+            return None, f"(file_utils::copy_dir_ne) old directory '{dest}' can't be removed: {err}"
     try:
         shutil.copytree(origin, dest)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg
+        return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
@@ -329,10 +340,7 @@ def move_dir_ne(origin: str, dest: str) -> ResultTuple:
     try:
         shutil.move(origin, dest)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg
+        return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
 
 
@@ -351,10 +359,7 @@ def get_subdirs_ne(path: str) -> ResultTuple:
     try:
         subdirs = [subdir.name for subdir in os.scandir(path) if subdir.is_dir()]
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return [], msg
+        return [], f"{e.__class__.__name__}: {str(e)}"
     return subdirs, ""
 
 
@@ -373,10 +378,7 @@ def get_file_list_ne(path: str) -> ResultTuple:
     try:
         file_list = [file.name for file in os.scandir(path) if file.is_file()]
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return [], msg
+        return [], f"{e.__class__.__name__}: {str(e)}"
     return file_list, ""
 
 
@@ -393,10 +395,7 @@ def get_total_items_ne(path: str) -> ResultTuple:
     try:
         total_items = len([item.name for item in os.scandir(path)])
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return 0, msg
+        return 0, f"{e.__class__.__name__}: {str(e)}"
     return total_items, ""
 
 
@@ -438,10 +437,7 @@ def get_item_type_ne(path: str) -> ResultTuple:
         else:
             return "", "not exists"
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return "", msg
+        return "", f"{e.__class__.__name__}: {str(e)}"
 
     return item_type, ""
 
@@ -452,6 +448,109 @@ def get_user_home_dir() -> str:
 
 def get_cwd() -> str:
     return os.getcwd()
+
+
+def get_tree_dir_list(root_dir: str, exclude_dir_list) -> ResultTuple:
+    """
+    Walk thru dirs inside the 'root_dir' and make a list of all dirs and their sub dirs.
+    If a dir path starts with one of the dir paths in the 'exclude_dir_list', it and its contents
+    will not be included into the result.
+    All paths except 'root_dir' are relative to the 'root_dir'.
+    Return list of all sub dirs inside 'root_dir', the paths are relative to the 'root_dir'
+    and do not start with dot and slash (./)
+
+
+    :param root_dir: absolute path to the root dir of the tree
+    :param exclude_dir_list: tuple, list or set of paths relative to the 'root_dir',
+                             without starting dot and slash (./)
+    :return: ResultTuple (List[str], ErrorMsg)
+    """
+    base_path = root_dir
+    base_path_len = len(base_path)
+    result = []
+    try:
+        for path, dirs, files in os.walk(base_path):
+            relative_path = path[base_path_len + 1:]
+            if not relative_path:  # do not add empty paths
+                continue
+
+            excluded = False
+
+            # Check if path is in the exclude_dir_list
+            for excluded_path in exclude_dir_list:
+                if not excluded_path:  # ignore empty strings
+                    continue
+                if relative_path.startswith(excluded_path):
+                    excluded = True
+                    break
+            if not excluded:
+                # Append path without base_path part to the list
+                result.append(relative_path)
+
+    except Exception as e:
+        return None, f"{e.__class__.__name__}: {str(e)}"
+
+    return result, ""
+
+
+def get_tree_file_list(root_dir: str, tree_dir_list: list, excluded_file_list) -> ResultTuple:
+    """
+    Create a tree file list based on its tree_dir_list;
+    File paths starting with any path in 'exclude_file_list' will not be included
+    into the result.
+    :param root_dir: Absolute path to the tree root dir
+    :param tree_dir_list: List of relative paths
+    :param excluded_file_list: Tuple, list or set of relative paths
+    :return: ResultTuple (list[str], ErrorMsg)
+    """
+
+    base_path = root_dir
+    result = []
+    # Append empty string to tree_dir_list to get also files in the 'root_dir'
+    tree_dir_list.append("")
+    try:
+        for d in tree_dir_list:
+            current_dir = base_path + os.sep + d
+            files, err = get_file_list_ne(current_dir)
+            if err:
+                return result, err
+
+            for f in files:
+                relative_file_name = d + os.sep + f
+                if not d:
+                    relative_file_name = f
+
+                # Check if file name is in the exclude_file_list
+                excluded = False
+                for excluded_file in excluded_file_list:
+                    if not excluded_file:
+                        continue
+                    if relative_file_name == excluded_file:
+                        excluded = True
+                        break
+
+                if not excluded:
+                    result.append(relative_file_name)
+
+    except Exception as e:
+        return result, f"{e.__class__.__name__}: {str(e)}"
+    tree_dir_list.remove("")
+
+    return result, ""
+
+
+def get_file_size_ne(path: str) -> ResultTuple:
+    """
+    Get file size without exceptions.
+    :param path: absolute path to the file
+    :return: ResultTuple (int, ErrorMsg)
+    """
+    fsize = 0
+    try:
+        fsize = os.path.getsize(path)
+    except Exception as e:
+        return fsize, f"{e.__class__.__name__}: {str(e)}"
+    return fsize, ""
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Environment variables
@@ -511,10 +610,7 @@ def unzip_tar_gz(file: str, dest_dir: str, remove_after_extract=False) -> Result
         if remove_after_extract:
             remove_file_ne(file)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg + str(dest_dir)
+        return None, f"{e.__class__.__name__}: {str(e)}, destination dir: {str(dest_dir)}"
     return None, ""
 
 
@@ -535,10 +631,7 @@ def zip_file_tar_gz(file, dest_file, remove_after=False) -> ResultTuple:
         if remove_after:
             remove_file(file)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg + " when creating file " + str(dest_file)
+        return None, f"{e.__class__.__name__}: {str(e)} when creating file '{str(dest_file)}'"
     return None, ""
 
 
@@ -559,10 +652,7 @@ def zip_dir_tar_gz(source_dir: str, dest_file: str, remove_after=False) -> Resul
         if remove_after:
             remove_dir_ne(source_dir)
     except Exception as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg + " when creating file " + str(dest_file)
+        return None, f"{e.__class__.__name__}: {str(e)} when creating file '{str(dest_file)}'"
     return None, ""
 
 
@@ -585,10 +675,7 @@ def download_into_file(url, dest_file) -> ResultTuple:
     try:
         response_header = urllib.request.urlretrieve(url, dest_file)[1]
     except error.URLError as e:
-        msg = str(e)
-        if not msg:
-            msg = str(e.__class__.__name__)
-        return None, msg
+        return None, f"{e.__class__.__name__}: {str(e)}"
     return response_header, ""
 
 

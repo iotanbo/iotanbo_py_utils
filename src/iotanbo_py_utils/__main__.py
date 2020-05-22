@@ -1,5 +1,5 @@
 """
-Entrypoint module, in case you use `python -miotanbo_py_utils`.
+Entry-point module, in case you use `python -m iotanbo_py_utils`.
 
 
 Why does this file exist, and why __main__? For more info, read:

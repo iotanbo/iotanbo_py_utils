@@ -26,3 +26,30 @@ class StrUtils:
         :return: string like 'CamelCaseString'
         """
         return ''.join(word.title() for word in name.split('_'))
+
+    @staticmethod
+    def strip_symbol(text: str, left_side_sym: str, right_side_sym: str,
+                     strip_whitespace_before: bool = True,
+                     strip_whitespace_after: bool = False) -> str:
+        """
+        Remove 'left_side_sym' from the beginning and 'right_side_sym' from the end of the text
+        if those symbols exist.
+        Strip whitespaces according to params.
+        Return stripped string.
+
+
+        :param text:
+        :param left_side_sym:
+        :param right_side_sym:
+        :param strip_whitespace_before:
+        :param strip_whitespace_after:
+        :return: str
+        """
+        if strip_whitespace_before:
+            text = text.strip()
+        text = text.lstrip(left_side_sym)
+        text = text.rstrip(right_side_sym)
+        if strip_whitespace_after:
+            text = text.strip()
+        return text
+

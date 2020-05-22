@@ -1,6 +1,6 @@
-========
-Overview
-========
+================
+Iotanbo Py Utils
+================
 
 .. start-badges
 
@@ -37,6 +37,12 @@ Python utility collection by iotanbo
 
 * Free software: MIT license
 
+Overview
+=============
+This is a small convenience python library that allows working with files, strings, console etc.
+Initially it was developed for internal usage with other 'iotanbo' projects, so the documentation
+is rather brief. You can see usage examples in the tests.
+
 Installation
 ============
 
@@ -49,38 +55,3 @@ You can also install the in-development version with::
     pip install https://github.com/iotanbo/iotanbo_py_utils/archive/master.zip
 
 
-Documentation
-=============
-
-
-To use the project:
-
-.. code-block:: python
-
-    import iotanbo_py_utils
-    iotanbo_py_utils.longest()
-
-
-Development
-===========
-
-To run the all tests run::
-
-    tox
-
-Note, to combine the coverage data from all the tox environments run:
-
-.. list-table::
-    :widths: 10 90
-    :stub-columns: 1
-
-    - - Windows
-      - ::
-
-            set PYTEST_ADDOPTS=--cov-append
-            tox
-
-    - - Other
-      - ::
-
-            PYTEST_ADDOPTS=--cov-append tox

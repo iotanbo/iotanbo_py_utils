@@ -16,8 +16,14 @@ def _remove_dir(path: str) -> None:
 
 
 def main():
-    print(f"Current 'iotanbo_py_utils' version is {iotanbo_py_utils.__version__}")
-    prompt = "Choose what to increment (1 - major, 2 - minor, 3 - patch, 0 - skip version change): "
+    current_version_str = iotanbo_py_utils.__version__
+    current_version_list = current_version_str.split('.')
+
+    major = int(current_version_list[0])
+    minor = int(current_version_list[1])
+    patch = int(current_version_list[2])
+    print(f"Current 'iotanbo_py_utils' version is {current_version_str}")
+    prompt = "Choose what to increment (1 - major, 2 - minor, 3 - patch, 0 - skip version change, q - quit): "
     choice = -1
     try:
         choice = input(prompt)
@@ -36,12 +42,15 @@ def main():
     elif choice == 1:
         confirm = input("Do you confirm bumping major version (y/n)? ")
         cmd = ("bumpversion", "--allow-dirty", "major")
+        major += 1
     elif choice == 2:
         confirm = input("Do you confirm bumping minor version (y/n)? ")
         cmd = ("bumpversion", "--allow-dirty", "minor")
+        minor += 1
     elif choice == 3:
         confirm = input("Do you confirm bumping patch (y/n)? ")
         cmd = ("bumpversion", "--allow-dirty", "patch")
+        patch += 1
     else:
         print("Wrong input, operation canceled.")
         exit(0)
@@ -65,7 +74,7 @@ def main():
     if commit_msg:
         subprocess.check_call(("git", "commit", "-m", commit_msg), env=dict(os.environ))
         # Create new version tag
-        new_tag = 'v' + iotanbo_py_utils.__version__
+        new_tag = f"v{major}.{minor}.{patch}"
         subprocess.check_call(("git", "tag", new_tag), env=dict(os.environ))
         print("Done.")
     else:

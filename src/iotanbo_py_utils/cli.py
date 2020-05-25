@@ -14,13 +14,22 @@ Why does this file exist, and why not put this in __main__?
 
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
+import sys
 
 import iotanbo_py_utils
+from iotanbo_py_utils import console_man_test
 
 
 def main(*_, **__):
     """
     Report version
     """
-    print(f"iotanbo_py_utils version {iotanbo_py_utils.__version__}")
+    args = sys.argv
+
+    if 'contest' in args:
+        print("Starting console manual test:")
+        console_man_test.input_ex_test()
+    else:
+        print(f"iotanbo_py_utils version {iotanbo_py_utils.__version__}")
+
     return 0

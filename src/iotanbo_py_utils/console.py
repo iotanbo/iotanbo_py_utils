@@ -259,13 +259,27 @@ class Console:
 
         while True:
             # Format the prompt
-            tip = [
-                ('class:description', _prompt),
-                ('class:description', f"{skip_msg}: "),
-            ]
 
-            # Get for user input
-            result = prompt(tip, default=default_val, style=style)
+            if min_len and default_val:  # empty values not allowed and there is a default value
+                # default value may be prompted in square brackets
+                tip = [
+                    ('class:description', f"{_prompt}{skip_msg} ["),
+                    ('class:def_val', default_val),
+                    ('class:description', "]: "),
+                ]
+                # Get for user input
+                result = prompt(tip, style=style)
+                # If result is empty and min_len > 0, assign default val to the result
+                if not result:
+                    result = default_val
+
+            else:  # empty values allowed
+                tip = [
+                    ('class:description', _prompt),
+                    ('class:description', f"{skip_msg}: "),
+                ]
+                # Get for user input
+                result = prompt(tip, default=default_val, style=style)
 
             # Check if skip value was entered
             if skip_val:
@@ -309,45 +323,3 @@ class Console:
                 continue
 
             return result, ""
-
-
-
-    # @staticmethod
-    # def input_ex(_key: str, key_attribs: dict) -> str:
-    #     """
-    #     Extended user input.
-    #     Interactively ask user to enter/confirm one value,
-    #     'key_attribs' are used to nicely format the prompt and verify if the value is correct.
-    #     :param _key: single key
-    #     :param key_attribs: {'val': str, 'val_type': str, 'desc': str, 'allow_empty': bool }
-    #                             val: default value
-    #                             val_type: value type ('str', 'int', 'bool')
-    #                             desc: description to be shown to user
-    #                             allow_empty: if True, user is allowed to enter empty string as a value
-    #                             TODO: use 'validation_re' key to optionally check against regular expression
-    #     :return: str: user confirmed value
-    #     """
-    #     if key_attribs["allow_empty"]:
-    #         tip = [
-    #             ('class:description', key_attribs["desc"]),
-    #             ('class:description', ": ?"),
-    #             ('class:def_val', ' []: '),
-    #         ]
-    #         user_confirmed_val = prompt(tip, default=key_attribs["val"], style=style)
-    #     else:
-    #         while True:
-    #             tip = [
-    #                 ('class:description', key_attribs["desc"]),
-    #                 ('class:description', ": ?"),
-    #                 ('class:def_val', ' ['),
-    #                 ('class:def_val', key_attribs["val"]),
-    #                 ('class:def_val', ']: '),
-    #             ]
-    #             user_confirmed_val = prompt(tip, style=style)
-    #             if user_confirmed_val or key_attribs["val"]:
-    #                 break
-    #             else:
-    #                 print("This value can't be empty. Try again.")
-    #         if not user_confirmed_val:
-    #             user_confirmed_val = key_attribs["val"]
-    #     return user_confirmed_val

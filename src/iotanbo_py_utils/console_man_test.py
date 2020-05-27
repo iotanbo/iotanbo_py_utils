@@ -139,7 +139,7 @@ def input_str_ex_blacklist_test():
 def input_str_ex_whitelist_test():
     # Test validation_func
     choice, meta = Console.input_str_ex("Select ['one', 'two', 'three']",
-                                        min_len=0, max_len=5,
+                                        min_len=1, max_len=5,
                                         skip_val="s",
                                         default_val="one",
                                         white_list=['one', 'two', 'three'])
@@ -177,5 +177,5 @@ if __name__ == '__main__':
     # input_str_ex_skip_test()
     # input_str_ex_length_limit_test()
     # input_str_ex_blacklist_test()
-    # input_str_ex_whitelist_test()
+    input_str_ex_whitelist_test()
     input_str_ex_validation_func_test()

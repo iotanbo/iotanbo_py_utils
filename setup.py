@@ -25,7 +25,7 @@ def read(*names, **kwargs):
 
 setup(
     name='iotanbo_py_utils',
-    version='0.0.8',
+    version='0.0.9',
     license='MIT',
     description='Python utility collection by iotanbo',
     long_description='%s\n%s' % (
@@ -68,6 +68,8 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
+        'prompt_toolkit',
+        # 'requests',
     ],
     extras_require={
         # eg:

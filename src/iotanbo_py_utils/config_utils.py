@@ -4,8 +4,8 @@ Author: iotanbo
 
 from configparser import ConfigParser
 
-from iotanbo_py_utils.error import ResultTuple
 from iotanbo_py_utils import file_utils
+from iotanbo_py_utils.error import ResultTuple
 
 
 def read_config_into_dict_ne(*, cfg_file, cfg_string=None,

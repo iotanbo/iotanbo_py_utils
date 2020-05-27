@@ -4,6 +4,7 @@ Bump version and publish on pypi.org tool
 import os
 import shutil
 import subprocess
+
 # import sys
 import iotanbo_py_utils
 
@@ -77,6 +78,9 @@ def main():
         new_tag = f"v{major}.{minor}.{patch}"
         subprocess.check_call(("git", "tag", new_tag), env=dict(os.environ))
         print("Done.")
+        choice = input(f"Do you wish to publish 'master' and '{new_tag}' on github.com (y/n)? ")
+        if choice == 'y':
+            subprocess.check_call(("git", "push", "origin", "master", new_tag), env=dict(os.environ))
     else:
         print("Canceled.")
         exit(0)

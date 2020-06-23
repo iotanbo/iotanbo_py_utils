@@ -3,7 +3,7 @@ import struct
 
 class Bytebuf:
     """
-    Bytebuf is a binary data storage class with API inspired by Java.nio.bytebuffer
+    Bytebuf is a binary data storage class with simplified API inspired by Java.nio.Bytebuffer
     """
 
     def __init__(self, size,
@@ -24,7 +24,20 @@ class Bytebuf:
         self.writer_i = 0
         self.size = size
 
-    def get_view(self, start_index, end_index) -> memoryview:
+    def __str__(self) -> str:
+        return f"Bytebuf<size: {self.size}, reader: {self.reader_i}, writer: {self.writer_i}, " \
+               f"data: {self.get_unread_view().tobytes()}>"
+
+    def __repr__(self):
+        return self.__str__()
+
+    def get_unread_size(self) -> int:
+        """
+        Get unread data size.
+        """
+        return self.writer_i - self.reader_i
+
+    def get_view(self, start_index: int, end_index: int) -> memoryview:
         """
         Get memory view of the underlying bytearray (zero-copy).
 
@@ -73,6 +86,11 @@ class Bytebuf:
         Set reader index to 0 and writer index to the end of unread data.
         :return: None
         """
+
+        # Correct the error if reader index is greater then writer index
+        if self.reader_i > self.writer_i:
+            self.reader_i = self.writer_i
+
         if not self.reader_i:
             return
 
@@ -150,6 +168,11 @@ class Bytebuf:
         self.writer_i += 4
 
     def read_double(self) -> float:
+        """
+        Read 64-bit double precision floating point value from buffer.
+
+        :return: float
+        """
         if self.byteorder == "big":
             result = struct.unpack('>d', self.buf[self.reader_i:self.reader_i + 8])
         else:
@@ -158,6 +181,10 @@ class Bytebuf:
         return result[0]
 
     def write_double(self, double: float) -> None:
+        """
+        Write 64-bit double precision floating point value into the buffer.
+        """
+
         if self.byteorder == "big":
             memoryview(self.buf)[self.writer_i:self.writer_i+8] = struct.pack('>d', double)
         else:
@@ -178,6 +205,12 @@ class Bytebuf:
         return result
 
     def write_bytes(self, data: bytes) -> None:
+        """
+        Append bytes at current writer index;
+        Increment writer index accordingly.
+
+        :param data:
+        """
         data_size = len(data)
         memoryview(self.buf)[self.writer_i:self.writer_i + data_size] = data
         self.writer_i += data_size
@@ -192,7 +225,9 @@ class Bytebuf:
         :param encoding: "utf-8" default
         """
         str_len = self.read_uint32()
-        return self.read_bytes(str_len).tobytes().decode(encoding=encoding)
+        result = self.buf[self.reader_i:self.reader_i+str_len].decode(encoding=encoding)
+        self.reader_i += str_len
+        return result
 
     def write_str(self, string: str, encoding="utf-8") -> None:
         """

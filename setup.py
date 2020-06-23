@@ -69,6 +69,7 @@ setup(
     install_requires=[
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
         'prompt_toolkit',
+        'aiofile',
         # 'requests',
     ],
     extras_require={

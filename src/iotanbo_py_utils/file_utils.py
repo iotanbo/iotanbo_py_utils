@@ -4,6 +4,7 @@ import shutil
 import subprocess  # for execute_shell_cmd
 import tarfile
 import urllib.request
+import zlib
 from pathlib import Path
 from urllib import error
 
@@ -150,6 +151,7 @@ def path_base_and_leaf_ne(path: str) -> ResultTuple:
 def write_text_file_ne(filename: str, contents: str = '', encoding: str = "utf-8") -> ResultTuple:
     """
     Create a new text file and write contents into it (do not raise exceptions).
+
     If file with specified name already exists, it will be overwritten.
     :return: ResultTuple: (None, ErrorMsg):
                          ErrorMsg: empty string if success, or error message otherwise.
@@ -165,6 +167,7 @@ def write_text_file_ne(filename: str, contents: str = '', encoding: str = "utf-8
 def read_text_file_ne(filename: str, encoding: str = "utf-8",) -> ResultTuple:
     """
     Read a text file (do not raise exceptions).
+
     :param filename: path to file
     :param encoding: text file encoding ("utf-8" default)
 
@@ -177,6 +180,41 @@ def read_text_file_ne(filename: str, encoding: str = "utf-8",) -> ResultTuple:
         return result, "file_not_exists"
     try:
         with open(file=filename, mode='r', encoding=encoding) as f:
+            return f.read(), ""
+    except Exception as e:
+        return result, f"{e.__class__.__name__}: {str(e)}"
+
+
+def write_bin_file_ne(filename: str, contents: bytes) -> ResultTuple:
+    """
+    Create a new binary file and write contents into it (do not raise exceptions).
+    If file with specified name already exists, it will be overwritten.
+
+    :return: ResultTuple: (None, ErrorMsg):
+                         ErrorMsg: empty string if success, or error message otherwise.
+    """
+    try:
+        with open(filename, 'w+b') as f:
+            f.write(contents)
+        return None, ""
+    except Exception as e:
+        return None, f"{e.__class__.__name__}: {str(e)}"
+
+
+def read_bin_file_ne(filename: str) -> ResultTuple:
+    """
+    Read a text file (do not raise exceptions).
+
+    :param filename: path to file
+    :return: ResultTuple: (Result, ErrorMsg):
+                         Result: bytes - file contents if success;
+                         ErrorMsg: str - empty string if success, or error message otherwise.
+    """
+    result = ""
+    if not file_exists_ne(filename):
+        return result, "file_not_exists"
+    try:
+        with open(file=filename, mode='rb') as f:
             return f.read(), ""
     except Exception as e:
         return result, f"{e.__class__.__name__}: {str(e)}"
@@ -551,6 +589,44 @@ def get_file_size_ne(path: str) -> ResultTuple:
     except Exception as e:
         return fsize, f"{e.__class__.__name__}: {str(e)}"
     return fsize, ""
+
+
+def file_crc32_ne(filename: str, buf_size: int = 1024*100) -> ResultTuple:
+    """
+    Calculate file crc32 without exceptions.
+
+    :param filename: path to file
+    :param buf_size: memory buffer size
+    :return: ResultTuple(crc: int, ErrorMsg: str):
+                         crc: file crc32 as int
+    """
+    try:
+        file_size = os.path.getsize(filename)
+
+        if file_size < buf_size:
+            remainder_size = file_size
+            iterations = 0
+        else:
+            iterations = file_size // buf_size
+            remainder_size = file_size % buf_size
+
+        crc32 = 0
+
+        # Synchronous variant
+        with open(filename, mode="rb") as f:
+            for _ in range(iterations):
+                data = f.read(buf_size)
+                crc32 = zlib.crc32(data, crc32)
+
+            # Read the remainder
+            data = f.read(remainder_size)
+            crc32 = zlib.crc32(data, crc32)
+
+    except Exception as e:
+        msg = f"{e.__class__.__name__}: {str(e)}"
+        return 0, msg
+    return crc32, ""
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Environment variables

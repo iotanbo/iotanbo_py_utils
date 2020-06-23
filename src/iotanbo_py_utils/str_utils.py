@@ -30,7 +30,7 @@ class StrUtils:
     @staticmethod
     def strip_symbol(text: str, left_side_sym: str, right_side_sym: str,
                      strip_whitespace_before: bool = True,
-                     strip_whitespace_after: bool = False) -> str:
+                     strip_whitespace_after: bool = True) -> str:
         """
         Remove 'left_side_sym' from the beginning and 'right_side_sym' from the end of the text
         if those symbols exist.

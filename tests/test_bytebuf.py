@@ -3,11 +3,9 @@ Tests for bytebuf.py
 Author: iotanbo
 """
 
-# import pytest
 import math
 
 from iotanbo_py_utils.bytebuf import Bytebuf
-from memory_profiler import profile
 
 
 def test_init():
@@ -94,7 +92,7 @@ def test_multi_read_write():
     # Read back
     assert buf.read_str() == "Hello"
     assert buf.read_int32() == -22
-    assert buf.read_bytes(4) ==  b"\x11\x22\x33\x44"
+    assert buf.read_bytes(4) == b"\x11\x22\x33\x44"
     assert math.isclose(buf.read_float32(), .3377, abs_tol=.00001)
     assert math.isclose(buf.read_double(), 77.12345678e5, rel_tol=.00001)
 
@@ -113,16 +111,3 @@ def test_compact():
     buf.compact()
     assert buf.reader_i == 0
     assert buf.get_free_space() == 16
-
-
-@profile
-def memory_profiler_test():
-    buf = Bytebuf(16 * 1024 ** 2)
-    buf.write_int64(-12345678901234)
-    buf.write_uint64(12345678901234)
-    assert buf.read_int64() == -12345678901234
-
-
-# python3 -m memory_profiler ./test_bytebuf.py
-if __name__ == '__main__':
-    memory_profiler_test()

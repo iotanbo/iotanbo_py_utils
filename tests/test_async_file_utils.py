@@ -3,17 +3,18 @@ Tests for async_file_utils.py
 Author: iotanbo
 """
 
-"""
-NOTE:
-    * Async file_crc32_ne() runs 2 times slower than synchronous variant.
-      Is there a benefit of using it?
-"""
-
 import pytest
 import os
 from iotanbo_py_utils import async_file_utils
 from iotanbo_py_utils import file_utils
 import time
+
+
+"""
+NOTE:
+    * Async file_crc32_ne() runs 2 times slower than synchronous variant.
+      Is there a benefit of using it?
+"""
 
 
 @pytest.mark.asyncio
@@ -43,7 +44,8 @@ async def test_file_crc32_ne(tmpdir):
     elapsed = time.perf_counter() - start
 
     assert not err
-    print(f"ASYNC BIG_FILE CRC: {crc_async}, hex: {hex(crc_async)}, size: {len(big_file_contents) / 1024**2} Mb, time: {elapsed * 1000} millis")
+    print(f"ASYNC BIG_FILE CRC: {crc_async}, hex: {hex(crc_async)}, "
+          f"size: {len(big_file_contents) / 1024**2} Mb, time: {elapsed * 1000} millis")
 
     # Compare with sync variant
     start = time.perf_counter()
@@ -52,6 +54,7 @@ async def test_file_crc32_ne(tmpdir):
 
     assert not err
     print(
-        f"SYNC BIG_FILE CRC: {crc_sync}, hex: {hex(crc_sync)}, size: {len(big_file_contents) / 1024 ** 2} Mb, time: {elapsed * 1000} millis")
+        f"SYNC BIG_FILE CRC: {crc_sync}, hex: {hex(crc_sync)}, "
+        f"size: {len(big_file_contents) / 1024 ** 2} Mb, time: {elapsed * 1000} millis")
 
     assert crc_sync == crc_async

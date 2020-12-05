@@ -1,8 +1,13 @@
+import os
+
 import pytest
 
 from iotanbo_py_utils import file_utils
-from iotanbo_py_utils.error import ERR
-from iotanbo_py_utils.error import VAL
+# from iotanbo_py_utils.error import ERR
+# from iotanbo_py_utils.error import VAL
+
+VAL = 0
+ERR = 1
 
 
 @pytest.fixture(scope="session")
@@ -80,6 +85,30 @@ def test_create_remove_symlink_ne(existing_text_file, existing_dir):
     assert file_utils.symlink_exists_ne(dir_symlink)
     assert file_utils.remove_symlink_ne(dir_symlink)
     assert not file_utils.symlink_exists_ne(dir_symlink)
+
+
+def test_remove_dir_contents_ne(existing_dir):
+    jp = os.path.join
+    d = 'dir_with_contents'
+    test_dir = jp(existing_dir, d)
+    file_utils.create_path_ne(test_dir)
+    os.chdir(test_dir)
+    file_utils.create_path_ne(jp('tmp', 'subdir1'))
+    file_utils.create_path_ne('.hidden')
+    file_utils.write_text_file_ne('file1.txt', 'file1.txt')
+    file_utils.write_text_file_ne('.hidden_file2', '.hidden_file2')
+    file_utils.write_text_file_ne(jp('.hidden', '.hidden-file'), '.hidden-file')
+
+    assert file_utils.dir_exists_ne(jp('tmp', 'subdir1'))
+    assert file_utils.dir_exists_ne('.hidden')
+    assert file_utils.file_exists_ne('file1.txt')
+    assert file_utils.file_exists_ne('.hidden_file2')
+    assert file_utils.file_exists_ne(jp('.hidden', '.hidden-file'))
+
+    # print(f"DEBUG test_dir BEFORE: '{test_dir}'")
+    file_utils.remove_dir_contents_ne(test_dir)
+    assert file_utils.dir_exists_ne(test_dir)
+    assert file_utils.dir_empty_ne(test_dir)
 
 
 def test_path_base_and_leaf():

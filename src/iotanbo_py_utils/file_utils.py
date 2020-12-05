@@ -148,6 +148,22 @@ def path_base_and_leaf_ne(path: str) -> ResultTuple:
         return None, f"{e.__class__.__name__: {str(e)}}"
 
 
+def ensure_file_directory_exists(path_to_file: str) -> ResultTuple:
+    """
+    Ensure that directory for the specified file exists.
+    If it does not, create one (the entire path).
+
+    :param path_to_file: path to file
+    :return: ResultTuple (None, ErrorMsg)
+    """
+    dir_file_tuple, err = path_base_and_leaf_ne(path_to_file)
+    dir_name = dir_file_tuple[0]
+    if not dir_exists_ne(dir_name):
+        return create_path_ne(dir_name)
+    else:
+        return None, ""
+
+
 def write_text_file_ne(filename: str, contents: str = '', encoding: str = "utf-8") -> ResultTuple:
     """
     Create a new text file and write contents into it (do not raise exceptions).
@@ -286,7 +302,7 @@ def remove_dir_ne(path) -> ResultTuple:
     :param path:
     :return: ResultTuple: (None, ErrorMsg):
                          ErrorMsg: empty string if the directory was removed or not exists,
-                       or error message otherwise;
+                         or error message otherwise;
     """
     if dir_exists_ne(path):
         try:
@@ -294,6 +310,28 @@ def remove_dir_ne(path) -> ResultTuple:
         except Exception as e:
             return None, f"{e.__class__.__name__}: {str(e)}"
     return None, ""
+
+
+def remove_dir_contents_ne(path) -> ResultTuple:
+    """
+    Remove directory contents, no exceptions.
+    :param path: directory to be emptied
+    :return: ResultTuple: (None, ErrorMsg):
+                         ErrorMsg: empty string if the directory was removed or not exists,
+                         or error message otherwise;
+    """
+
+    with os.scandir(path) as it:
+        for filename in it:
+            file_path = os.path.join(path, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                return None, f"Failed to delete '{file_path}': {e.__class__.__name__}, {str(e)}"
+        return None, ""
 
 
 def copy_file_ne(origin, dest) -> ResultTuple:
@@ -655,8 +693,22 @@ def env_var_exists(name: str) -> bool:
 # Execute shell commands
 
 # 'cmd_and_args' must be a list, each argument must be a separate list element
-def execute_shell_cmd(cmd_and_args: list):
-    subprocess.check_call(cmd_and_args, env=dict(os.environ))
+def execute_shell_cmd(cmd: list):
+    # if os.name == 'nt':
+    #     result = []
+    #     process = subprocess.Popen(cmd,
+    #                             shell=True,
+    #                             stdout=subprocess.PIPE,
+    #                             stderr=subprocess.PIPE)
+    #     for line in process.stdout:
+    #         result.append(line)
+    #     errcode = process.returncode
+    #     for line in result:
+    #         print(line)
+    #     if errcode is not None:
+    #         raise Exception('cmd %s failed, see above for details', cmd)
+    # else:
+    subprocess.check_call(cmd, env=dict(os.environ))
 
 
 # ---------------------------------------------------------------------------------------------------------------------

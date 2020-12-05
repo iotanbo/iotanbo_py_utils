@@ -13,6 +13,7 @@ def read_config_into_dict_ne(*, cfg_file, cfg_string=None,
     """
     Read configuration from specified config file into dict preserving sections.
     dict format is like {'section1': {'key1': 'val1', ... }}
+
     :param cfg_file: Absolute path to the config file.
     :param cfg_string: Read config from string instead of file.
     :param preserve_case: if True, key and value character case will be preserved

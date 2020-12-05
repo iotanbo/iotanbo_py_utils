@@ -2,7 +2,7 @@
 Author: iotanbo
 """
 
-import aiofile
+# import aiofile
 import os
 import zlib
 

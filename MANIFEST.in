@@ -2,6 +2,7 @@ graft docs
 graft src
 graft ci
 graft tests
+graft profiling
 
 include .bumpversion.cfg
 include .coveragerc
@@ -16,4 +17,4 @@ include README.rst
 
 include tox.ini .travis.yml .appveyor.yml
 
-global-exclude *.py[cod] __pycache__/* *.so *.dylib bumppub.py
+global-exclude *.py[cod] __pycache__/* *.so *.dylib bumpub.py

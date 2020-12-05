@@ -48,12 +48,12 @@ class WebSvcError:
     Connection or handler is closed either normally or due to an error.
     """
 
-    PING = 'PING'
+    UNEXP_PING = 'UNEXP_PING'
     """
     'PING' msg received instead of data (not an error in most cases).
     """
 
-    PONG = 'PONG'
+    UNEXP_PONG = 'UNEXP_PONG'
     """
     'PONG' msg received instead of data (not an error in most cases).
     """

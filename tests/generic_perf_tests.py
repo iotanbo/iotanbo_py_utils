@@ -2,7 +2,7 @@
 Generic performance and best practice tests
 """
 
-import timeit
+# import timeit
 import time
 
 
@@ -63,12 +63,12 @@ def bytearray_fillin_literal_test():  # The best (80...100 times faster)
 
 
 def list_ws_dict_iteration_test():
-    l = []
+    lst = []
     d = {}
     total_iterations = 1000000
 
     for i in range(total_iterations):
-        l.append(i)
+        lst.append(i)
         d[str(i)] = i
 
     list_sum = 0
@@ -77,7 +77,7 @@ def list_ws_dict_iteration_test():
     # List performance check
     time_start = time.perf_counter()
 
-    for i in l:
+    for i in lst:
         list_sum += i
 
     time_taken_list = (time.perf_counter() - time_start) * 1000

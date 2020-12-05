@@ -212,7 +212,10 @@ class Bytebuf:
         :param data:
         """
         data_size = len(data)
-        memoryview(self.buf)[self.writer_i:self.writer_i + data_size] = data
+        wi = self.writer_i
+        if data_size > self.get_free_space():
+            raise ValueError("Bytebuf overflow (too small buffer size or forgot to compact?)")
+        memoryview(self.buf)[wi:wi + data_size] = data
         self.writer_i += data_size
 
     # ** STRINGS **

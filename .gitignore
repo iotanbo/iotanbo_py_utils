@@ -1,6 +1,10 @@
 *.py[cod]
 __pycache__
 
+# Files created during tests
+invalid_test_file.txt
+~removed/
+
 
 .python-version
 
@@ -31,6 +35,7 @@ pip-wheel-metadata/
 pip-log.txt
 
 # Unit test / coverage reports
+.nox
 .coverage
 .tox
 .coverage.*

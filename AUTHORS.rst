@@ -1,5 +1,0 @@
-
-Authors
-=======
-
-* iotanbo - iotanbo.com

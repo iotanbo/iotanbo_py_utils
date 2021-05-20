@@ -1,57 +1,73 @@
-================
-Iotanbo Py Utils
-================
+Iotanbo Python Utilities
+========================
 
-.. start-badges
+|PyPI| |Python Version| |License|
 
-.. list-table::
-    :stub-columns: 1
+|Read the Docs| |Tests| |Codecov|
 
-    * - tests
-      - | |travis| |appveyor|
-        | |codecov|
-    * - package
-      - | |commits-since|
+|pre-commit| |Black|
 
-.. |travis| image:: https://api.travis-ci.org/iotanbo/iotanbo_py_utils.svg?branch=master
-    :alt: Travis-CI Build Status
-    :target: https://travis-ci.org/iotanbo/iotanbo_py_utils
+.. |PyPI| image:: https://img.shields.io/pypi/v/iotanbo_py_utils.svg
+   :target: https://pypi.org/project/iotanbo_py_utils/
+   :alt: PyPI
+.. |Python Version| image:: https://img.shields.io/pypi/pyversions/iotanbo_py_utils
+   :target: https://pypi.org/project/iotanbo_py_utils
+   :alt: Python Version
+.. |License| image:: https://img.shields.io/pypi/l/iotanbo_py_utils
+   :target: https://opensource.org/licenses/MIT
+   :alt: License
+.. |Read the Docs| image:: https://img.shields.io/readthedocs/iotanbo_py_utils/latest.svg?label=Read%20the%20Docs
+   :target: https://iotanbo_py_utils.readthedocs.io/
+   :alt: Read the documentation at https://iotanbo_py_utils.readthedocs.io/
+.. |Tests| image:: https://github.com/iotanbo/iotanbo_py_utils/workflows/Tests/badge.svg
+   :target: https://github.com/iotanbo/iotanbo_py_utils/actions?workflow=Tests
+   :alt: Tests
+.. |Codecov| image:: https://codecov.io/gh/iotanbo/iotanbo_py_utils/branch/main/graph/badge.svg
+   :target: https://codecov.io/gh/iotanbo/iotanbo_py_utils
+   :alt: Codecov
+.. |pre-commit| image:: https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white
+   :target: https://github.com/pre-commit/pre-commit
+   :alt: pre-commit
+.. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
+   :target: https://github.com/psf/black
+   :alt: Black
 
-.. |appveyor| image:: https://ci.appveyor.com/api/projects/status/github/iotanbo/iotanbo_py_utils?branch=master&svg=true
-    :alt: AppVeyor Build Status
-    :target: https://ci.appveyor.com/project/iotanbo/iotanbo_py_utils
-
-.. |codecov| image:: https://codecov.io/github/iotanbo/iotanbo_py_utils/coverage.svg?branch=master
-    :alt: Coverage Status
-    :target: https://codecov.io/github/iotanbo/iotanbo_py_utils
-
-.. |commits-since| image:: https://img.shields.io/github/commits-since/iotanbo/iotanbo_py_utils/v0.0.10.svg
-    :alt: Commits since latest release
-    :target: https://github.com/iotanbo/iotanbo_py_utils/compare/v0.0.10...master
-
-
-
-.. end-badges
-
-Python utility collection by iotanbo
-
-* Free software: MIT license
-
-Overview
-=============
-This is a small convenience python library that allows working with files, strings, console etc.
-Initially it was developed for internal usage with other 'iotanbo' projects, so the documentation
-is rather brief. You can see usage examples in the tests.
 
 Installation
-============
+------------
 
-::
+You can install *Iotanbo Python Utilities* via pip_ from PyPI_:
 
-    pip install iotanbo_py_utils
+.. code:: console
 
-You can also install the in-development version with::
-
-    pip install https://github.com/iotanbo/iotanbo_py_utils/archive/master.zip
+   $ pip install iotanbo_py_utils
 
 
+Usage
+-----
+
+This package was initially intended for internal usage.
+See the API reference for more information.
+
+
+License
+-------
+
+Distributed under the terms of the `MIT license`_,
+*Iotanbo Python Utilities* is free and open source software.
+
+
+Issues
+------
+
+If you encounter any problems,
+please `file an issue`_ along with a detailed description.
+
+
+.. _MIT license: https://opensource.org/licenses/MIT
+.. _PyPI: https://pypi.org/
+.. _file an issue: https://github.com/iotanbo/iotanbo_py_utils/issues
+.. _pip: https://pip.pypa.io/
+.. github-only
+.. _Contributor Guide: CONTRIBUTING.rst
+.. _Usage: https://iotanbo_py_utils.readthedocs.io/en/latest/usage.html

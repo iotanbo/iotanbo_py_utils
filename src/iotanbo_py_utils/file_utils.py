@@ -1,827 +1,1422 @@
-import ntpath
+"""File utilities."""
+import hashlib
 import os
 import shutil
-import subprocess  # for execute_shell_cmd
+import sys
 import tarfile
-import urllib.request
 import zlib
-from pathlib import Path
-from urllib import error
+from typing import List
+from typing import Optional
 
-from iotanbo_py_utils.error import IotanboError
-from iotanbo_py_utils.error import ResultTuple
+from pathvalidate import validate_filepath  # type: ignore[attr-defined]
+from result import Err
+from result import Ok
+from result import Result
+
+from .error import Error
+from .error import ErrorKind
 
 
-def file_exists_ne(path_to_file: str) -> bool:
+def is_path_valid_ne(path: str, os_family: str = "") -> bool:
+    """Check if the path is (grammatically) valid for the specified platform.
+
+    This does not actually perform check for path existence or possibility
+    of its creation.
+
+    Args:
+        path (str): path to file or directory.
+        os_family (str): OS family name, one of ("", "windows", "linux", "macos").
+
+    Returns:
+        `True` if path is valid, `False` otherwise.
     """
-    Check if file exists.
-    :return: True if file exists, false if not exists or is a directory.
-    :except: None
-    """
+    if not os_family:
+        if sys.platform == "win32":  # pragma: no cover
+            os_family = "windows"  # pragma: no cover
+        elif sys.platform == "linux":  # pragma: no cover
+            os_family = "linux"  # pragma: no cover
+        elif sys.platform == "darwin":  # pragma: no cover
+            os_family = "macos"  # pragma: no cover
     try:
-        result = os.path.isdir(path_to_file)
-        if result:
-            return False
-        result = os.path.exists(path_to_file)
-        return result
+        validate_filepath(path, platform=os_family)
+        return True
     except Exception:
         return False
 
 
-# def file_exists(path_to_file: str) -> bool:
-#     """
-#     Check if file exists.
-#     :param path_to_file: string
-#     :return: True if file exists, false if not exists or is a directory.
-#     :except: IotanboError if any kind of exception occurred during check
-#     """
-#     try:
-#         result = os.path.isdir(path_to_file)
-#         if result:
-#             return False
-#         result = os.path.exists(path_to_file)
-#         return result
-#     except Exception as e:
-#         raise IotanboError(str(e)) from e
+def get_item_type_ne(path: str) -> Result[str, Error]:
+    """Get the type of a file system item without raising exceptions.
 
+    Args:
+        path (str): path to a file system item.
 
-def dir_exists_ne(path_to_dir: str) -> bool:
-    """
-    Check if dir exists.
-    :param path_to_dir:
-    :return: True if dir exists, false if not exists or is a file.
-    :except: None
+    Returns:
+        Result[str, Error]:
+             Ok (str):  if item exists: 'file', 'dir, 'symlink' or 'other'.
+             Err (kind == `FileNotFoundError`): if item not exists.
+             Err (kind == `PermissionError`): wrong permissions.
+             Err (kind == `...`): if other error(s) occurred.
     """
     try:
-        return os.path.isdir(path_to_dir)
-    except Exception:
-        pass
-    return False
+        # Check if item exists first
+        if not os.path.exists(path):
+            return Err(Error(ErrorKind.FileNotFoundError))
 
-
-# def dir_exists(path_to_dir: str) -> bool:
-#     """
-#     Check if dir exists.
-#     :param path_to_dir:
-#     :return: True if dir exists, false if not exists or is a file.
-#     :except: IotanboError if any kind of exception occurred during check
-#     """
-#     try:
-#         return os.path.isdir(path_to_dir)
-#     except Exception as e:
-#         raise IotanboError(str(e)) from e
-
-
-def create_symlink_ne(src: str, dest: str) -> ResultTuple:
-    """
-    Create a symlink to src with name `dest`;
-    In case of error, error message is returned as second element of ResultTuple.
-    :param src: path to file, directory or symlink
-    :param dest: path to symlink to be created
-    :return: ResultTuple: (None, ErrorMsg)
-            ErrorMsg: str - empty string if success, error message otherwise
-    """
-    _, err = get_item_type_ne(src)
-    if err:
-        return None, err
-    try:
-        os.symlink(src, dest)
-    except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
-
-
-def symlink_exists_ne(path: str) -> bool:
-    """
-    Check if symlink exists;
-    No exceptions.
-    """
-    try:
-        return os.path.islink(path)
-    except Exception:
-        return False
-
-
-def remove_symlink_ne(path: str) -> ResultTuple:
-    """
-    Remove symlink from the file system (do not raise exceptions).
-    :param path: string
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: str - empty string if the link
-                                   was removed or not exists,
-                                   or error message otherwise;
-    """
-    if symlink_exists_ne(path):
+        # Check if symlink with specified pathname exists;
+        # this check must go first because symlink is also a file
+        item_type = "other"
         try:
-            os.unlink(path)
-        except Exception as e:
-            return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
+            if os.path.islink(path):
+                item_type = "symlink"
+        except Exception as e:  # pragma: no cover
+            # Corresponds to any kind of errors and is hard
+            # to be automatically tested.
+            return Err(Error.from_exception(e))  # pragma: no cover
+        # Check if dir with specified pathname exists;
+        if item_type == "other":
+            try:
+                if os.path.isdir(path):
+                    item_type = "dir"
+                else:  # if item exists and it is not a symlink or dir, then it is file
+                    item_type = "file"
+            # any kind of errors that may occur
+            # while executing os.path.isdir(path)
+            except Exception as e:  # pragma: no cover
+                return Err(Error.from_exception(e))  # pragma: no cover
+    # any kind of errors that may occur
+    # while executing os.path.exists(path)
+    except Exception as e:  # pragma: no cover
+        return Err(Error.from_exception(e))  # pragma: no cover
+    return Ok(item_type)
 
 
-def path_base_and_leaf(path: str) -> (str, str):
+def _item_exists_ne(path: str, item_type: str) -> Result[bool, Error]:
+    """Check if file, directory or symlink exist without raising exceptions.
+
+    Args:
+        path (str): path to the item.
+        item_type (str): one of ('file', 'dir', 'symlink').
+
+    Returns:
+        Result[bool, Error]:
+             Ok (True):  item of specified type exists.
+             Ok (False): item does not exist.
+             Err (kind == `TypeError`): item exists but has different type.
+             Err (kind == `PermissionError`): wrong permissions.
+             Err (kind == `...`): other error(s) occurred.
     """
-    Split path to a base part and a file or directory name, like in the following example:
-    path: '/a/b'; base: '/a'; leaf: 'b'. Return (base: str, leaf: str).
-    :raise: IotanboError
-    """
-    try:
-        head, tail = ntpath.split(path)
-        if not tail:  # in case there is trailing slash at the end of path
-            return ntpath.split(head)[0], ntpath.basename(head)
-        return head, tail
-    except Exception as e:
-        raise IotanboError(str(e)) from e
+    result = get_item_type_ne(path)
+    if result.is_err():
+        err = result.unwrap_err()
+        if ErrorKind.FileNotFoundError == err.kind:
+            return Ok(False)
+        else:
+            # other errors while getting fs item type
+            return Err(err)  # pragma: no cover
+    existing_items_type = result.unwrap()
+    if existing_items_type == item_type:
+        # item exists and is of correct type
+        return Ok(True)
+    # item exists but has a different type
+    return Err(Error(ErrorKind.TypeError, existing_items_type))
 
 
-def path_base_and_leaf_ne(path: str) -> ResultTuple:
-    """
-    Split path to a base part and a file or directory name.
-    Return ResultTuple ((base: str, leaf: str), ErrorMsg)
-    """
-    try:
-        head, tail = ntpath.split(path)
-        if not tail:  # in case there is trailing slash at the end of path
-            return (ntpath.split(head)[0], ntpath.basename(head)), ""
-        return (head, tail), ""
-    except Exception as e:
-        return None, f"{e.__class__.__name__: {str(e)}}"
+def create_path_ne(path: str, *, overwrite: bool = False) -> Result[None, Error]:
+    """Create a path (series of directories) without raising exceptions.
 
+    Args:
+        path (str): path to a new directory.
+        overwrite (bool): silently overwrite directory if it exists.
 
-def ensure_file_directory_exists(path_to_file: str) -> ResultTuple:
-    """
-    Ensure that directory for the specified file exists.
-    If it does not, create one (the entire path).
-
-    :param path_to_file: path to file
-    :return: ResultTuple (None, ErrorMsg)
-    """
-    dir_file_tuple, err = path_base_and_leaf_ne(path_to_file)
-    dir_name = dir_file_tuple[0]
-    if not dir_exists_ne(dir_name):
-        return create_path_ne(dir_name)
-    else:
-        return None, ""
-
-
-def write_text_file_ne(filename: str, contents: str = '', encoding: str = "utf-8") -> ResultTuple:
-    """
-    Create a new text file and write contents into it (do not raise exceptions).
-
-    If file with specified name already exists, it will be overwritten.
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if success, or error message otherwise.
-    """
-    try:
-        with open(filename, 'w', encoding=encoding) as f:
-            f.write(contents)
-        return None, ""
-    except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-
-
-def read_text_file_ne(filename: str, encoding: str = "utf-8",) -> ResultTuple:
-    """
-    Read a text file (do not raise exceptions).
-
-    :param filename: path to file
-    :param encoding: text file encoding ("utf-8" default)
-
-    :return: ResultTuple: (Result, ErrorMsg):
-                         Result: str - file contents if success;
-                         ErrorMsg: str - empty string if success, or error message otherwise.
-    """
-    result = ""
-    if not file_exists_ne(filename):
-        return result, "file_not_exists"
-    try:
-        with open(file=filename, mode='r', encoding=encoding) as f:
-            return f.read(), ""
-    except Exception as e:
-        return result, f"{e.__class__.__name__}: {str(e)}"
-
-
-def write_bin_file_ne(filename: str, contents: bytes) -> ResultTuple:
-    """
-    Create a new binary file and write contents into it (do not raise exceptions).
-    If file with specified name already exists, it will be overwritten.
-
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if success, or error message otherwise.
+    Returns:
+        Result[None, Error]:
+            Ok (None): path successfully created.
+            Err (kind == `FileExistsError`): directory already exists and `overwrite` is `False`.
+            Err (kind == `TypeError`): item exists but is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
     try:
-        with open(filename, 'w+b') as f:
-            f.write(contents)
-        return None, ""
-    except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-
-
-def read_bin_file_ne(filename: str) -> ResultTuple:
-    """
-    Read a text file (do not raise exceptions).
-
-    :param filename: path to file
-    :return: ResultTuple: (Result, ErrorMsg):
-                         Result: bytes - file contents if success;
-                         ErrorMsg: str - empty string if success, or error message otherwise.
-    """
-    result = ""
-    if not file_exists_ne(filename):
-        return result, "file_not_exists"
-    try:
-        with open(file=filename, mode='rb') as f:
-            return f.read(), ""
-    except Exception as e:
-        return result, f"{e.__class__.__name__}: {str(e)}"
-
-
-def read_text_file_lines_ne(filename: str, encoding: str = "utf-8",
-                            line_sep: str = "\n") -> ResultTuple:
-    """
-    Read a text file (do not raise exceptions).
-
-    :param filename: path to file
-    :param encoding: text file encoding ("utf-8" default)
-    :param line_sep: line separator char(s)
-
-    :return: ResultTuple: (Result, ErrorMsg):
-                         Result: List[str] - list of lines if success;
-                         ErrorMsg: str - empty string if success, or error message otherwise.
-    """
-    result = []
-    contents, err = read_text_file_ne(filename, encoding=encoding)
-    if err:
-        return result, []
-    result = contents.split(sep=line_sep)
-    return result, ""
-
-
-def create_path_ne(path: str, overwrite=False) -> ResultTuple:
-    """
-    Create path in the filesystem (do not raise exceptions).
-    :param path: path to be created
-    :param overwrite: if true, existing old directory will be overwritten
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: str - empty string if success, or error message otherwise.
-    """
-    try:
-        if dir_exists_ne(path):
-            if not overwrite:
-                return None, ""
-            shutil.rmtree(path)
+        result = dir_exists_ne(path)
+        if result.is_err():
+            # unexpected error while checking for file existence
+            return Err(result.unwrap_err())
+        else:
+            exists = result.unwrap()
+            if exists:
+                if not overwrite:
+                    return Err(Error(ErrorKind.FileExistsError))
+                else:
+                    # remove existing directory and its contents
+                    shutil.rmtree(path)
         os.makedirs(path)
     except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
+        return Err(Error.from_exception(e))
+    return Ok(None)
 
 
-def remove_file(path: str) -> None:
-    os.remove(path)
+def create_symlink_ne(
+    src: str,
+    dest: str,
+    *,
+    overwrite: bool = False,
+) -> Result[None, Error]:
+    """Create a symlink with name `dest` to `src` without raising exceptions.
 
+    Args:
+        src (str): path to source.
+        dest (str): path to symlink file.
+        overwrite (bool): silently overwrite if it exists.
 
-def remove_file_ne(path: str) -> ResultTuple:
+    Returns:
+        Result[None, Error]:
+            Ok (None): symlink successfully created.
+            Err (kind == `ValueError`): src or dest is invalid path and
+            `validate_paths=True`.
+            Err (kind == `FileExistsError`): dest symlink already exists and `overwrite=False`.
+            Err (kind == `FileNotFoundError`): src does not exist and
+            `validate_paths=True`.
+            Err (kind == `TypeError`): dest exists but is not a symlink.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Remove the file from the file system (do not raise exceptions).
-    :param path:
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if the file successfully removed
-                                   and/or not exists, or error message otherwise;
-    """
-    if file_exists_ne(path):
-        try:
-            os.remove(path)
-        except Exception as e:
-            return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
-
-
-def remove_dir_ne(path) -> ResultTuple:
-    """
-    Remove directory and all its contents (a tree) from the file system (do not raise exceptions).
-    :param path:
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if the directory was removed or not exists,
-                         or error message otherwise;
-    """
-    if dir_exists_ne(path):
-        try:
-            shutil.rmtree(path)
-        except Exception as e:
-            return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
-
-
-def remove_dir_contents_ne(path) -> ResultTuple:
-    """
-    Remove directory contents, no exceptions.
-    :param path: directory to be emptied
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if the directory was removed or not exists,
-                         or error message otherwise;
-    """
-
-    with os.scandir(path) as it:
-        for filename in it:
-            file_path = os.path.join(path, filename)
-            try:
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            except Exception as e:
-                return None, f"Failed to delete '{file_path}': {e.__class__.__name__}, {str(e)}"
-        return None, ""
-
-
-def copy_file_ne(origin, dest) -> ResultTuple:
-    """
-    Copy a file (do not raise exception).
-    :param origin:
-    :param dest:
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if existing file was copied,
-                         or error message otherwise;
-    """
-    if not file_exists_ne(origin):
-        return None, 'origin does not exist'
-    if remove_file_ne(dest)[1]:
-        return None, "old file can't be removed"
+    # `src` must be validated because otherwise
+    # system silently creates a valid symlink to invalid fs item
+    if not is_path_valid_ne(src):
+        return Err(Error(ErrorKind.FileNotFoundError, f"src path '{src}' is invalid"))
+    if not is_path_valid_ne(dest):
+        return Err(Error(ErrorKind.FileNotFoundError, f"dest path '{dest}' is invalid"))
     try:
-        shutil.copy(origin, dest)
+        # check src for existence and validity
+        msg_prefix = "(src error) "
+        result = get_item_type_ne(src)
+        if result.is_err():
+            # unexpected error while checking for src existence
+            error = result.unwrap_err()
+            error.msg = msg_prefix + error.msg
+            return Err(error)
+
+        # check dest for existence and validity
+        msg_prefix = "(dest error) "
+        result = symlink_exists_ne(dest)  # type: ignore[assignment]
+        if result.is_err():
+            # unexpected error while checking for dest existence
+            error = result.unwrap_err()  # pragma: no cover
+            error.msg = msg_prefix + error.msg  # pragma: no cover
+            return Err(error)  # pragma: no cover
+        else:
+            dest_exists = result.unwrap()
+            if dest_exists:
+                if not overwrite:
+                    error = Error(ErrorKind.FileExistsError)
+                    error.msg = msg_prefix + error.msg
+                    return Err(error)
+                else:
+                    # remove dest symlink
+                    os.unlink(dest)
+        os.symlink(src, dest)
     except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
+        return Err(Error.from_exception(e))
+    return Ok(None)
 
 
-def move_file_ne(origin: str, dest: str) -> ResultTuple:
+def _common_validation_before_write_file(
+    path: str, overwrite: bool
+) -> Result[None, Error]:
+    # check for file existence
+    result = file_exists_ne(path)
+    if result.is_err():
+        # error while checking for file existence
+        return Err(result.unwrap_err())
+    else:
+        if result.unwrap():
+            # file exists
+            if not overwrite:
+                return Err(Error(ErrorKind.FileExistsError))
+    return Ok(None)
+
+
+def write_file_ne(
+    path: str,
+    contents: str = "",
+    encoding: str = "utf-8",
+    *,
+    overwrite: bool = False,
+    newline: str = "\n",
+) -> Result[None, Error]:
+    """Create a new text file and write contents into it without raising exceptions.
+
+    Args:
+        path (str): path to file.
+        contents (str): string to be written into file.
+        encoding (str): text file encoding ("utf-8" default).
+        overwrite (bool): rewrite file if it already exists.
+        newline (str): new line separator.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): file written/rewritten successfully.
+            Err (kind == `FileExistsError`): file already exists and
+            `overwrite` is `False`.
+            Err (kind == `TypeError`): path is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+
+    Example:
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        >>>     if write_file_ne(os.path.join(tmpdir,"test.txt"), "test").is_err():
+        >>>      ...  # process error
     """
-    Move a file (do not raise exception).
-    :param origin:
-    :param dest:
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if existing file was moved,
-                         or error message otherwise;
-    """
-    if not file_exists_ne(origin):
-        return None, 'origin does not exist'
-    if remove_file_ne(dest)[1]:
-        return None, "old file can't be removed"
+    validation_result = _common_validation_before_write_file(path, overwrite)
+    if validation_result.is_err():
+        return Err(validation_result.unwrap_err())
     try:
-        shutil.move(origin, dest)
+        with open(path, "w", encoding=encoding, newline=newline) as f:
+            f.write(contents)
+        return Ok(None)
     except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
+        return Err(Error.from_exception(e))
 
 
-def copy_dir_ne(origin: str, dest: str) -> ResultTuple:
+def write_binary_file_ne(
+    path: str,
+    contents: bytes,
+    *,
+    overwrite: bool = False,
+) -> Result[None, Error]:
+    """Create and write data to binary file.
+
+    Args:
+        path (str): path to file.
+        contents (bytes): file contents.
+        overwrite (bool): rewrite file if it already exists.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): file written/overwritten successfully.
+            Err (kind == `FileExistsError`): file already exists and
+            `overwrite` is `False`.
+            Err (kind == `TypeError`): path is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Copy a directory and its contents (tree) to the dest, do not raise exception.
-    If old 'dest' exists, it will be removed first.
-    :param origin:
-    :param dest:
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if directory was copied
-                         and exists or error message otherwise;
-    """
-
-    if not dir_exists_ne(origin):
-        return None, 'origin does not exist'
-
-    if dir_exists_ne(dest):
-        _, err = remove_dir_ne(dest)
-        if err:
-            return None, f"(file_utils::copy_dir_ne) old directory '{dest}' can't be removed: {err}"
+    validation_result = _common_validation_before_write_file(path, overwrite)
+    if validation_result.is_err():
+        return Err(validation_result.unwrap_err())
     try:
-        shutil.copytree(origin, dest)
-    except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
+        with open(path, "w+b") as f:
+            f.write(contents)
+        return Ok(None)
+    except Exception as e:  # pragma: no cover
+        return Err(Error.from_exception(e))  # pragma: no cover
 
 
-def move_dir_ne(origin: str, dest: str) -> ResultTuple:
+def _common_validation_before_read_file(path: str) -> Result[None, Error]:
+    result = file_exists_ne(path)
+    if result.is_err():
+        # other errors like file is a directory etc.
+        return Err(result.unwrap_err())  # pragma: no cover
+    file_exists = result.unwrap()
+    if not file_exists:
+        return Err(Error(ErrorKind.FileNotFoundError))
+    return Ok(None)
+
+
+def read_file_ne(path: str, encoding: str = "utf-8") -> Result[str, Error]:
+    r"""Read a text file without raising exceptions.
+
+    Universal new line separation mode is used, that means any of (`\r`, `\r\n`)
+    will be replaced with `\n`.
+
+    Args:
+        path (str): path to file.
+        encoding (str): text file encoding ("utf-8" default).
+
+    Returns:
+        Result[str, Error]:
+            Ok (str): file contents.
+            Err (Error.kind == FileNotFoundError`): file does not exist.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (Error.kind == `...`): other error(s) occurred.
+
+    Example:
+        >>> contents = read_file_ne("test.txt")
+        >>> if contents.is_err():
+        >>>     ...  # process error
+        >>> else:
+        >>>     contents = contents.unwrap()
     """
-    Move a directory and its contents (a tree) into a dest (do not raise exception).
-    If old 'dest' exists, it will be removed first.
-    This function is equivalent to 'rename'.
-    :param origin:
-    :param dest:
-    :return: ResultTuple: (None, ErrorMsg):
-                         ErrorMsg: empty string if success or error message otherwise;
-    """
-    if not dir_exists_ne(origin):
-        return None, 'origin does not exist'
-    if remove_dir_ne(dest)[1]:
-        return None, "old directory can't be removed"
+    validation = _common_validation_before_read_file(path)
+    if validation.is_err():
+        return Err(validation.unwrap_err())
     try:
-        shutil.move(origin, dest)
+        with open(file=path, mode="r", encoding=encoding) as f:
+            return Ok(f.read())
+    except Exception as e:  # pragma: no cover
+        # it's hard to automate a test
+        # where a file can't be read from file system
+        return Err(Error.from_exception(e))  # pragma: no cover
+
+
+def read_binary_file_ne(path: str) -> Result[bytes, Error]:
+    """Read a binary file without raising exceptions.
+
+    Args:
+        path: path to file.
+
+    Returns:
+        Result[bytes, Error]:
+            Ok (bytes): file contents.
+            Err (Error.kind == FileNotFoundError`): file does not exist.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (Error.kind == `...`): other error(s) occurred.
+    """
+    validation = _common_validation_before_read_file(path)
+    if validation.is_err():
+        return Err(validation.unwrap_err())
+    try:
+        with open(file=path, mode="rb") as f:
+            return Ok(f.read())
+    except Exception as e:  # pragma: no cover
+        # it's hard to automate a test
+        # where a file can't be read from file system
+        return Err(Error.from_exception(e))  # pragma: no cover
+
+
+def read_file_into_lines_ne(
+    path: str, encoding: str = "utf-8"
+) -> Result[List[str], Error]:
+    r"""Read text file into a list of strings separated by `sep`.
+
+    Universal new line separation mode is used, that means any of (`\n`, `\r`, `\r\n`)
+    will be interpreted as line separator.
+
+    Args:
+        path: path to file.
+        encoding: text file encoding ("utf-8" default).
+
+    Returns:
+        Result[List[str], Error]:
+            Ok (List[str]): file contents as a list of lines.
+            Err (Error.kind == FileNotFoundError`): file does not exist.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (Error.kind == `...`): other error(s) occurred.
+    """
+    result = read_file_ne(path, encoding)
+    if result.is_err():
+        return Err(result.unwrap_err())
+    contents = result.unwrap()
+    if not contents:
+        # file is empty
+        return Ok([""])
+    return Ok(contents.split(sep="\n"))
+
+
+def file_exists_ne(path: str) -> Result[bool, Error]:
+    """Check if file exists without raising exceptions.
+
+    Args:
+        path (str): path to file.
+
+    Returns:
+        Result[bool, Error]:
+            Ok (True): file exists.
+            Ok (False): file does not exist.
+            Err (kind == `TypeError`): item exists but has different type.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+
+    Example:
+        >>> if file_exists_ne("/path/to/file.txt").expect(
+        >>>     "Unexpected error while checking for file existence"
+        >>> ):
+        >>>     ...  # do something if file exists.
+
+    """
+    return _item_exists_ne(path, "file")
+
+
+def dir_exists_ne(path: str) -> Result[bool, Error]:
+    """Check if dir exists without raising exceptions.
+
+    Args:
+        path (str): path to directory.
+
+    Returns:
+        Result[bool, Error]:
+            Ok (True): directory exists.
+            Ok (False): directory does not exist.
+            Err (kind == `TypeError`): item exists but has different type.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    return _item_exists_ne(path, "dir")
+
+
+def symlink_exists_ne(path: str) -> Result[bool, Error]:
+    """Check if symlink exists without raising exceptions.
+
+    Args:
+        path (str): path to symlink.
+
+    Returns:
+        Result[bool, Error]:
+            Ok (True): symlink exists.
+            Ok (False): symlink does not exist.
+            Err (kind == `TypeError`): item exists but has different type.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    return _item_exists_ne(path, "symlink")
+
+
+def remove_file_ne(
+    path: str, *, fail_if_not_exists: bool = False
+) -> Result[None, Error]:
+    """Remove file without raising exceptions.
+
+    Args:
+        path (str): path to file.
+        fail_if_not_exists (bool): if True, return Error if file not exists.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): file successfully removed, or
+            does not exist and `fail_if_not_exists` is `False`.
+            Err (kind == `FileNotFoundError`): file does not exist and
+            `fail_if_not_exists` is `True`.
+            Err (kind == `TypeError`): item exists but is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    result = file_exists_ne(path)
+    if result.is_err():
+        # unexpected error while checking for file existence
+        return Err(result.unwrap_err())
+    if not result.unwrap():
+        # file does not exist
+        if not fail_if_not_exists:
+            return Ok(None)
+        return Err(Error(ErrorKind.FileNotFoundError))
+    try:
+        os.remove(path)
+    except Exception as e:  # pragma: no cover
+        # it's hard to automate a test
+        # where a file can't be deleted from file system
+        return Err(Error.from_exception(e))  # pragma: no cover
+    return Ok(None)
+
+
+def remove_dir_ne(
+    path: str, *, fail_if_not_exists: bool = False
+) -> Result[None, Error]:
+    """Remove directory and its contents without raising exceptions.
+
+    Args:
+        path (str): path to directory.
+        fail_if_not_exists (bool): if True, return Error if directory not exists.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): directory successfully removed, or
+            directory does not exist and `fail_if_not_exists` is `False`.
+            Err (kind == `FileNotFoundError`): directory does not exist and
+            `fail_if_not_exists` is `True`.
+            Err (kind == `TypeError`): item exists but is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    result = dir_exists_ne(path)
+    if result.is_err():
+        # unexpected error while checking for directory existence
+        return Err(result.unwrap_err())
+    if not result.unwrap():
+        # directory does not exist
+        if not fail_if_not_exists:
+            return Ok(None)
+        return Err(Error(ErrorKind.FileNotFoundError))
+    try:
+        shutil.rmtree(path)
+    except Exception as e:  # pragma: no cover
+        # it's hard to automate a test
+        # where a directory can't be deleted from file system
+        return Err(Error.from_exception(e))  # pragma: no cover
+    return Ok(None)
+
+
+def remove_symlink_ne(
+    path: str, *, fail_if_not_exists: bool = False
+) -> Result[None, Error]:
+    """Remove symlink from the file system without raising exceptions.
+
+    Args:
+        path (str): path to symlink.
+        fail_if_not_exists (bool): if True, return Error if symlink not exists.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): existing symlink successfully removed.
+            Err (kind == `FileNotFoundError`): symlink does not exist and
+            `fail_if_not_exists` is `True`.
+            Err (kind == `TypeError`): path is not a symlink.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): if other error(s) occurred.
+    """
+    result = symlink_exists_ne(path)
+    if result.is_err():
+        # errors like path is a file
+        return Err(result.unwrap_err())  # pragma: no cover
+    symlink_exists = result.unwrap()
+    if not symlink_exists:
+        if fail_if_not_exists:
+            return Err(Error(ErrorKind.FileNotFoundError))
+        else:
+            return Ok(None)
+    try:
+        os.unlink(path)
+    except Exception as e:  # pragma: no cover
+        # it's hard to automate a test
+        # where a symlink can't be deleted from file system
+        return Err(Error.from_exception(e))  # pragma: no cover
+    return Ok(None)
+
+
+def ensure_parent_dir_exists(path: str) -> Result[None, Error]:
+    """Ensure that the parent directory of the specified item exists. Create it if it does not.
+
+    Args:
+        path (str): path to a file system item (file, directory or symlink).
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): parent directory exists.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): parent item exists but is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    if not is_path_valid_ne(path):
+        return Err(Error(ErrorKind.FileNotFoundError))
+    head, _ = os.path.split(path)
+    result = dir_exists_ne(head)
+    if result.is_err():
+        # error while trying to figure out if parent dir exists
+        return Err(result.unwrap_err())
+    if result.unwrap():
+        # parent dir already exists
+        return Ok(None)
+    return create_path_ne(head)
+
+
+def remove_dir_contents_ne(path: str) -> Result[None, Error]:
+    """Remove all directory contents without rising exceptions.
+
+    Args:
+        path (str): path to a directory.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): contents removed.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    try:
+        with os.scandir(path) as it:
+            for item_name in it:
+                item_path = os.path.join(path, item_name)
+                try:
+                    if os.path.isfile(item_path) or os.path.islink(item_path):
+                        os.unlink(item_path)
+                    elif os.path.isdir(item_path):  # pragma:  no cover
+                        shutil.rmtree(item_path)
+                except Exception as e:  # pragma:  no cover
+                    # Permissions error and other
+                    return Err(Error.from_exception(e))  # pragma:  no cover
+            return Ok(None)
     except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-    return None, ""
+        return Err(Error.from_exception(e))
 
 
-def get_subdirs_ne(path: str) -> ResultTuple:
+def dir_empty_ne(path: str) -> Result[bool, Error]:
+    """Check if directory is empty, do not raise exceptions.
+
+    Args:
+        path (str): path to a directory.
+
+    Returns:
+        Result[bool, Error]:
+            Ok (True): directory is empty.
+            Ok (False): directory is not empty.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Get list of all first child subdirectories that the directory contains.
-    Does not raise exceptions.
-    :param path:
-    :return: ResultTuple: (subdirs, ErrorMsg):
-                         subdirs: list of subdirectory names
-                         ErrorMsg: empty string if success or error message otherwise;
+    try:
+        if any(os.scandir(path)):
+            return Ok(False)
+        return Ok(True)
+    except NotADirectoryError:
+        return Err(Error(ErrorKind.TypeError, cause="NotADirectoryError"))
+    except Exception as e:  # pragma:  no cover
+        # Permissions error and other
+        return Err(Error.from_exception(e))  # pragma:  no cover
+
+
+def _pre_copy_and_move_file_operations(
+    src: str, dest: str, *, overwrite: bool
+) -> Result[None, Error]:
+    result = file_exists_ne(src)
+    if result.is_err():
+        return Err(result.unwrap_err())
+    src_exists = result.unwrap()
+    if not src_exists:
+        return Err(Error(ErrorKind.FileNotFoundError, "source file does not exist"))
+
+    de_result = file_exists_ne(dest)
+    if de_result.is_err():
+        return Err(de_result.unwrap_err())
+    dest_exists = de_result.unwrap()
+    if dest_exists:
+        if not overwrite:
+            return Err(Error(ErrorKind.FileExistsError, "destination already exists"))
+        rm_result = remove_file_ne(dest)
+        if rm_result.is_err():
+            return Err(rm_result.unwrap_err())  # pragma: no cover
+    return Ok(None)
+
+
+def copy_file_ne(
+    src: str, dest: str, *, overwrite: bool = False
+) -> Result[None, Error]:
+    """Copy file without exceptions.
+
+    Args:
+        src (str): source file.
+        dest (str): destination file.
+        overwrite (bool): silently overwrite destination if exists.
+
+    Returns:
+        Result[None, Error]:
+        Ok (None): operation successful.
+        Err (kind == `FileNotFoundError`): src does not exist.
+        Err (kind == `FileExistsError`): destination file already exists and `overwrite=False`.
+        Err (kind == `TypeError`): src or dest is not a file.
+        Err (kind == `PermissionError`): wrong permissions.
+        Err (kind == `...`): other error(s) occurred.
     """
-    if not dir_exists_ne(path):
-        return [], 'path not exists'
+    pre_result = _pre_copy_and_move_file_operations(src, dest, overwrite=overwrite)
+    if pre_result.is_err():
+        return pre_result
+    try:
+        shutil.copy(src, dest)
+    except Exception as e:
+        return Err(Error.from_exception(e))
+    return Ok(None)
+
+
+def move_file_ne(
+    src: str, dest: str, *, overwrite: bool = False
+) -> Result[None, Error]:
+    """Move file without exceptions.
+
+    Args:
+        src (str): source file.
+        dest (str): destination file.
+        overwrite (bool): silently overwrite destination if exists.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): operation successful.
+            Err (kind == `FileNotFoundError`): src does not exist.
+            Err (kind == `FileExistsError`): destination file already exists
+            and `overwrite=False`.
+            Err (kind == `TypeError`): src or dest is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    pre_result = _pre_copy_and_move_file_operations(src, dest, overwrite=overwrite)
+    if pre_result.is_err():
+        return pre_result
+    try:
+        shutil.move(src, dest)
+    except Exception as e:  # pragma: no cover
+        # permission errors etc.
+        return Err(Error.from_exception(e))  # pragma: no cover
+    return Ok(None)
+
+
+def _pre_copy_and_move_tree_operations(
+    src: str, dest: str, *, overwrite: bool
+) -> Result[None, Error]:
+    result = dir_exists_ne(src)
+    if result.is_err():
+        return Err(result.unwrap_err())
+    src_exists = result.unwrap()
+    if not src_exists:
+        return Err(Error(ErrorKind.FileNotFoundError, "source dir does not exist"))
+
+    de_result = dir_exists_ne(dest)
+    if de_result.is_err():
+        return Err(de_result.unwrap_err())
+    dest_exists = de_result.unwrap()
+    if dest_exists:
+        if not overwrite:
+            return Err(
+                Error(ErrorKind.FileExistsError, "destination dir already exists")
+            )
+        rm_result = remove_dir_ne(dest)
+        if rm_result.is_err():
+            return rm_result  # pragma: no cover
+    return Ok(None)
+
+
+def copy_tree_ne(
+    src: str,
+    dest: str,
+    *,
+    overwrite: bool = False,
+    symlinks: bool = True,
+    ignore_dangling_symlinks: bool = True,
+) -> Result[None, Error]:
+    """Copy a directory tree without exceptions.
+
+    Args:
+        src (str): source directory.
+        dest (str): destination directory.
+        overwrite (bool): silently overwrite destination if exists.
+        symlinks (bool): copy symlinks, not files or directories they are pointing to.
+        ignore_dangling_symlinks (bool): do not fail if a symlink is invalid.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): operation successful.
+            Err (kind == `FileNotFoundError`): src does not exist.
+            Err (kind == `FileExistsError`): destination directory already exists and `overwrite=False`.
+            Err (kind == `TypeError`): src or dest is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    pre_result = _pre_copy_and_move_tree_operations(src, dest, overwrite=overwrite)
+    if pre_result.is_err():
+        return pre_result
+    try:
+        shutil.copytree(
+            src,
+            dest,
+            symlinks=symlinks,
+            ignore_dangling_symlinks=ignore_dangling_symlinks,
+        )
+    except Exception as e:  # pragma: no cover
+        # errors while executing shutil.copytree
+        return Err(Error.from_exception(e))  # pragma: no cover
+    return Ok(None)
+
+
+def move_tree_ne(
+    src: str, dest: str, *, overwrite: bool = False
+) -> Result[None, Error]:
+    """Move a directory tree without exceptions.
+
+    Note: all synlinks are moved without modification, that means
+    if the moved symlink targets any of moved files or directories using absolute path,
+    it becomes broken.
+
+    Args:
+        src (str): source directory.
+        dest (str): destination directory.
+        overwrite (bool): silently overwrite destination if exists.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): operation successful.
+            Err (kind == `FileNotFoundError`): src does not exist.
+            Err (kind == `FileExistsError`): destination directory    already exists and `overwrite=False`.
+            Err (kind == `TypeError`): src or dest is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    pre_result = _pre_copy_and_move_tree_operations(src, dest, overwrite=overwrite)
+    if pre_result.is_err():
+        return pre_result
+    try:
+        shutil.move(src, dest)
+    except Exception as e:  # pragma: no cover
+        # errors while executing shutil.copytree
+        return Err(Error.from_exception(e))  # pragma: no cover
+    return Ok(None)
+
+
+def _dir_validation(path: str) -> Result[None, Error]:
+    result = dir_exists_ne(path)
+    if result.is_err():
+        return Err(result.unwrap_err())
+    path_exists = result.unwrap()
+    if not path_exists:
+        return Err(
+            Error(ErrorKind.FileNotFoundError, f"directory '{path}' does not exist")
+        )
+    return Ok(None)
+
+
+def get_subdir_list_ne(path: str, *, sort: bool = True) -> Result[List[str], Error]:
+    """Get the list of the first-level sub-directories that the directory contains.
+
+    Args:
+        path (str): path to a directory.
+        sort (bool): sort the list alphabetically.
+
+    Returns:
+        Result[List[str], Error]:
+            Ok (List[str]): operation successful.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    validation = _dir_validation(path)
+    if validation.is_err():
+        return Err(validation.unwrap_err())
     # https://stackoverflow.com/questions/973473/getting-a-list-of-all-subdirectories-in-the-current-directory
     try:
         subdirs = [subdir.name for subdir in os.scandir(path) if subdir.is_dir()]
-    except Exception as e:
-        return [], f"{e.__class__.__name__}: {str(e)}"
-    return subdirs, ""
+        if sort:
+            return Ok(sorted(subdirs))
+        return Ok(subdirs)
+    except Exception as e:  # pragma: no cover
+        # error while doing file system operations
+        return Err(Error.from_exception(e))  # pragma: no cover
 
 
-def get_file_list_ne(path: str) -> ResultTuple:
+def get_subdir_list_recursively_ne(
+    path: str, *, sort: bool = True, ignore_list: Optional[List[str]] = None
+) -> Result[List[str], Error]:
+    """Get the list of all sub-directories that the directory contains.
+
+    Args:
+        path (str): path to a directory.
+        sort (bool): sort the list alphabetically.
+        ignore_list (Optional[List[str]]): sub-directories to be excluded
+        from the recursive search.
+        each string must be a relative path without starting `.`.
+
+    Returns:
+        Result[List[str], Error]:
+            Ok (List[str]): operation successful.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+
+    Example:
+        >>> ignore = ["dir-to-ignore", os.path.join("other-dir", "sub-subdir")]
+        >>> result = get_subdir_list_recursively_ne("some-dir", ignore_list=ignore)
+        >>> if result.is_ok():
+        >>>     subdirs = result.unwrap()
     """
-    List of files located in the directory. The list includes symlinks,
-    but does not include directories.
-    Does not raise exceptions.
-    :param path:
-    :return: ResultTuple: (file_list, ErrorMsg):
-                         file_list: list of files located in the directory;
-                         ErrorMsg: empty string if success or error message otherwise;
-    """
-    if not dir_exists_ne(path):
-        return [], 'path not exists'
-    try:
-        file_list = [file.name for file in os.scandir(path) if file.is_file()]
-    except Exception as e:
-        return [], f"{e.__class__.__name__}: {str(e)}"
-    return file_list, ""
+    validation = _dir_validation(path)
+    if validation.is_err():
+        return Err(validation.unwrap_err())
 
-
-def get_total_items_ne(path: str) -> ResultTuple:
-    """
-    Total number of child elements in the directory.
-    :param path:
-    :return: ResultTuple: (total_items: int, ErrorMsg):
-                         total_items: number of child items in the directory;
-                         ErrorMsg: empty string if success or error message otherwise;
-    """
-    if not dir_exists_ne(path):
-        return 0, 'path not exists'
-    try:
-        total_items = len([item.name for item in os.scandir(path)])
-    except Exception as e:
-        return 0, f"{e.__class__.__name__}: {str(e)}"
-    return total_items, ""
-
-
-def dir_empty_ne(path: str) -> bool:
-    """
-    Check if directory is empty. Do not raise exceptions.
-    :param path:
-    :return: True if dir is empty or does not exist, False if dir exists and not empty
-    """
-    try:
-        if os.path.exists(path) and os.path.isdir(path):
-            if not os.listdir(path):
-                return True
-            else:
-                return False
-    except Exception:
-        pass
-    return True
-
-
-def get_item_type_ne(path: str) -> ResultTuple:
-    """
-    Get type of the file system item ('file', 'dir, 'symlink').
-    Does not raise exceptions.
-    :param path:
-    :return: ResultTuple: (Result: str, ErrorMsg):
-             Result:  str - the file system item type ('file', 'dir, 'symlink');
-                            empty string is returned if type is unknown or item
-                            does not exist;
-             ErrorMsg: str - empty string if success, error message otherwise
-    """
-    try:
-        if symlink_exists_ne(path):  # symlink must be first because symlink is also a file
-            item_type = 'symlink'
-        elif file_exists_ne(path):
-            item_type = 'file'
-        elif dir_exists_ne(path):
-            item_type = 'dir'
-        else:
-            return "", "not exists"
-    except Exception as e:
-        return "", f"{e.__class__.__name__}: {str(e)}"
-
-    return item_type, ""
-
-
-def get_user_home_dir() -> str:
-    return str(Path.home())
-
-
-def get_cwd() -> str:
-    return os.getcwd()
-
-
-def get_tree_dir_list(root_dir: str, exclude_dir_list) -> ResultTuple:
-    """
-    Walk thru dirs inside the 'root_dir' and make a list of all dirs and their sub dirs.
-    If a dir path starts with one of the dir paths in the 'exclude_dir_list', it and its contents
-    will not be included into the result.
-    All paths except 'root_dir' are relative to the 'root_dir'.
-    Return list of all sub dirs inside 'root_dir', the paths are relative to the 'root_dir'
-    and do not start with dot and slash (./)
-
-
-    :param root_dir: absolute path to the root dir of the tree
-    :param exclude_dir_list: tuple, list or set of paths relative to the 'root_dir',
-                             without starting dot and slash (./)
-    :return: ResultTuple (List[str], ErrorMsg)
-    """
-    base_path = root_dir
-    base_path_len = len(base_path)
+    if ignore_list is None:
+        ignore_list = []
+    root_path = path
+    root_path_len = len(root_path)
     result = []
     try:
-        for path, dirs, files in os.walk(base_path):
-            relative_path = path[base_path_len + 1:]
+        for path, _, _ in os.walk(root_path):  # path, dirs, files
+            relative_path = path[root_path_len + 1 :]
             if not relative_path:  # do not add empty paths
                 continue
 
-            excluded = False
-
-            # Check if path is in the exclude_dir_list
-            for excluded_path in exclude_dir_list:
-                if not excluded_path:  # ignore empty strings
+            ignored = False
+            # Check if path is in the ignore_list
+            for ignored_path in ignore_list:
+                if not ignored_path:  # do not include empty strings
                     continue
-                if relative_path.startswith(excluded_path):
-                    excluded = True
+                if relative_path.startswith(ignored_path):
+                    ignored = True
                     break
-            if not excluded:
+            if not ignored:
                 # Append path without base_path part to the list
                 result.append(relative_path)
+    except Exception as e:  # pragma: no cover
+        # permissions and other system errors
+        return Err(Error.from_exception(e))  # pragma: no cover
+    if sort:
+        return Ok(sorted(result))
+    return Ok(result)
 
-    except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
 
-    return result, ""
+def get_file_list_ne(path: str, *, sort: bool = True) -> Result[List[str], Error]:
+    """Get the list of files in the directory, no exceptions.
 
+    Files inside sub-directories are not included. The list is sorted by default.
+    The result contains list of relative paths without starting dot.
 
-def get_tree_file_list(root_dir: str, tree_dir_list: list, excluded_file_list) -> ResultTuple:
+    Args:
+        path (str): path to a directory.
+        sort (bool): sort the list alphabetically.
+
+    Returns:
+        Result[List[str], Error]:
+            Ok (List[str]): operation successful.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Create a tree file list based on its tree_dir_list;
-    File paths starting with any path in 'exclude_file_list' will not be included
-    into the result.
-    :param root_dir: Absolute path to the tree root dir
-    :param tree_dir_list: List of relative paths
-    :param excluded_file_list: Tuple, list or set of relative paths
-    :return: ResultTuple (list[str], ErrorMsg)
-    """
-
-    base_path = root_dir
-    result = []
-    # Append empty string to tree_dir_list to get also files in the 'root_dir'
-    tree_dir_list.append("")
+    validation = _dir_validation(path)
+    if validation.is_err():  # pragma: no cover
+        # scenario already covered in previous test
+        return Err(validation.unwrap_err())  # pragma: no cover
     try:
-        for d in tree_dir_list:
-            current_dir = base_path + os.sep + d
-            files, err = get_file_list_ne(current_dir)
-            if err:
-                return result, err
-
-            for f in files:
-                relative_file_name = d + os.sep + f
-                if not d:
-                    relative_file_name = f
-
-                # Check if file name is in the exclude_file_list
-                excluded = False
-                for excluded_file in excluded_file_list:
-                    if not excluded_file:
-                        continue
-                    if relative_file_name == excluded_file:
-                        excluded = True
-                        break
-
-                if not excluded:
-                    result.append(relative_file_name)
-
-    except Exception as e:
-        return result, f"{e.__class__.__name__}: {str(e)}"
-    tree_dir_list.remove("")
-
-    return result, ""
+        file_list = [file.name for file in os.scandir(path) if file.is_file()]
+        if sort:
+            return Ok(sorted(file_list))
+        return Ok(file_list)
+    except Exception as e:  # pragma: no cover
+        # error while doing file system operations
+        return Err(Error.from_exception(e))  # pragma: no cover
 
 
-def get_file_size_ne(path: str) -> ResultTuple:
+def get_file_list_recursively_ne(
+    path: str, *, sort: bool = True, ignore_list: Optional[List[str]] = None
+) -> Result[List[str], Error]:
+    """Get the list of files and symlinks that the directory contains.
+
+    This includes the files in the nested sub-directories,
+    directories are not included.
+    The result is a list of relative paths without starting dot.
+
+    Args:
+        path (str): path to a directory.
+        sort (bool): sort the result list alphabetically.
+        ignore_list (Optional[List[str]]): files and sub-directories
+        to be excluded from the result and recursive search.
+        each string must be a relative path without starting `.`.
+
+    Returns:
+        Result[List[str], Error]:
+            Ok (List[str]): operation successful.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+
+    Example:
+        >>> ignore = ["dir-to-ignore", os.path.join("other-dir", "file-to-ignore")]
+        >>> result = get_file_list_recursively_ne("some-dir", ignore_list=ignore)
+        >>> if result.is_ok():
+        >>>     file_list = result.unwrap()
     """
-    Get file size without exceptions.
-    :param path: absolute path to the file
-    :return: ResultTuple (int, ErrorMsg)
+    validation = _dir_validation(path)
+    if validation.is_err():
+        return Err(validation.unwrap_err())
+
+    if ignore_list is None:
+        ignore_list = []
+
+    # Get list of all sub-directories
+    get_subdirs_result = get_subdir_list_recursively_ne(path, ignore_list=ignore_list)
+    if get_subdirs_result.is_err():
+        return Err(get_subdirs_result.unwrap_err())  # pragma: no cover
+    dirs = get_subdirs_result.unwrap()
+    dirs.append("")  # add root directory to the list
+
+    # search each directory for files and add them into common list
+    file_list = []
+    for d in dirs:
+        d_path = os.path.join(path, d)
+        get_files_result = get_file_list_ne(d_path, sort=False)
+        if get_files_result.is_err():
+            return Err(get_files_result.unwrap_err())  # pragma: no cover
+        local_file_list = get_files_result.unwrap()
+        for f in local_file_list:
+            if d:
+                relative_file_path = os.path.join(d, f)
+            else:
+                relative_file_path = f
+            if relative_file_path not in ignore_list:
+                file_list.append(relative_file_path)
+    if sort:
+        return Ok(sorted(file_list))
+    return Ok(file_list)
+
+
+def get_aggregated_file_list_ne(
+    base: str,
+    subdirs: List[str],
+    *,
+    sort: bool = True,
+    ignore_list: Optional[List[str]] = None,
+) -> Result[List[str], Error]:
+    """Get the list of all files of the `base` directory and the `subdirs`.
+
+    The result contains list of relative paths to the files without starting dot.
+    Symlinks are included into the result.
+    This is same as `get_file_list_recursively_ne()` but is cheaper
+    to use if you already have the list of the subdirs.
+
+    Args:
+        base (str): path to the base directory.
+        subdirs (List[str]): relative paths to sub-directories.
+        sort (bool): sort the result list alphabetically.
+        ignore_list (Optional[List[str]]): files and sub-directories
+        to be excluded from the result and recursive search.
+        each string must be a relative path without starting `.`.
+
+    Returns:
+        Result[List[str], Error]:
+            Ok (List[str]): operation successful.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+
+    Example:
+        >>> ignore = ["dir-to-ignore", os.path.join("other-dir", "file-to-ignore")]
+        >>> subdirs = ["sub-1", "sub-2"]
+        >>> result = get_aggregated_file_list_ne("base-dir", subdirs, ignore_list=ignore)
+        >>> if result.is_ok():
+        >>>     file_list = result.unwrap()
     """
-    fsize = 0
+    validation = _dir_validation(base)
+    if validation.is_err():
+        return Err(validation.unwrap_err())
+
+    if ignore_list is None:
+        ignore_list = []
+
+    if "" not in subdirs:
+        subdirs.append("")  # add base directory to the list
+
+    # search each directory for files and add them into common list
+    file_list = []
+    for d in subdirs:
+        d_path = os.path.join(base, d)
+        get_files_result = get_file_list_ne(d_path, sort=False)
+        if get_files_result.is_err():
+            return Err(get_files_result.unwrap_err())  # pragma: no cover
+        local_file_list = get_files_result.unwrap()
+        for f in local_file_list:
+            if d:
+                relative_file_path = os.path.join(d, f)
+            else:
+                relative_file_path = f
+            if relative_file_path not in ignore_list:
+                file_list.append(relative_file_path)
+    if sort:
+        return Ok(sorted(file_list))
+    return Ok(file_list)
+
+
+def get_item_count_ne(path: str) -> Result[int, Error]:
+    """Get number of elements in the directory, do not raise exceptions.
+
+    Elements are files, directories, links. Only first child elements are counted.
+
+    Args:
+        path (str): path to a directory.
+
+    Returns:
+        Result[int, Error]:
+            Ok (int): operation successful.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    validation = _dir_validation(path)
+    if validation.is_err():  # pragma: no cover
+        # scenario already covered in previous test
+        return Err(validation.unwrap_err())  # pragma: no cover
     try:
-        fsize = os.path.getsize(path)
-    except Exception as e:
-        return fsize, f"{e.__class__.__name__}: {str(e)}"
-    return fsize, ""
+        total_items = len([item.name for item in os.scandir(path)])
+        return Ok(total_items)
+    except Exception as e:  # pragma: no cover
+        # error while doing file system operations
+        return Err(Error.from_exception(e))  # pragma: no cover
 
 
-def file_crc32_ne(filename: str, buf_size: int = 1024*100) -> ResultTuple:
+def get_file_size_ne(path: str) -> Result[int, Error]:
+    """Get file size in bytes, do not raise exceptions.
+
+    Args:
+        path (str): path to the file.
+
+    Returns:
+        Result[int, Error]:
+            Ok (int): file size in bytes.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Calculate file crc32 without exceptions.
-
-    :param filename: path to file
-    :param buf_size: memory buffer size
-    :return: ResultTuple(crc: int, ErrorMsg: str):
-                         crc: file crc32 as int
-    """
+    validation = file_exists_ne(path)
+    if validation.is_err():  # pragma: no cover
+        # scenario already covered in one of previous tests
+        return Err(validation.unwrap_err())  # pragma: no cover
     try:
-        file_size = os.path.getsize(filename)
+        return Ok(os.path.getsize(path))
+    except Exception as e:  # pragma: no cover
+        # error while doing file system operations
+        return Err(Error.from_exception(e))  # pragma: no cover
 
-        if file_size < buf_size:
-            remainder_size = file_size
-            iterations = 0
-        else:
-            iterations = file_size // buf_size
-            remainder_size = file_size % buf_size
 
+def get_file_crc32_ne(
+    path: str, *, read_buf_size: int = 65536 * 2
+) -> Result[int, Error]:
+    """Get CRC32 of a file, do not raise exceptions.
+
+    Args:
+        path (str): path to the file.
+        read_buf_size (int): read buffer size.
+
+    Returns:
+        Result[int, Error]:
+            Ok (int): CRC32 as an integer.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
+    """
+    validation = file_exists_ne(path)
+    if validation.is_err():  # pragma: no cover
+        # scenario already covered in one of previous tests
+        return Err(validation.unwrap_err())  # pragma: no cover
+    try:
         crc32 = 0
-
-        # Synchronous variant
-        with open(filename, mode="rb") as f:
-            for _ in range(iterations):
-                data = f.read(buf_size)
-                crc32 = zlib.crc32(data, crc32)
-
-            # Read the remainder
-            data = f.read(remainder_size)
-            crc32 = zlib.crc32(data, crc32)
-
-    except Exception as e:
-        msg = f"{e.__class__.__name__}: {str(e)}"
-        return 0, msg
-    return crc32, ""
+        b = bytearray(read_buf_size)
+        mv = memoryview(b)
+        with open(path, "rb", buffering=0) as f:
+            for n in iter(lambda: f.readinto(mv), 0):  # type: ignore
+                crc32 = zlib.crc32(mv[:n], crc32)
+            return Ok(crc32)
+    except Exception as e:  # pragma: no cover
+        # error while doing file system operations
+        return Err(Error.from_exception(e))  # pragma: no cover
 
 
-# ---------------------------------------------------------------------------------------------------------------------
-# Environment variables
+def get_file_crc32_hex_ne(
+    path: str, *, read_buf_size: int = 65536 * 2
+) -> Result[str, Error]:
+    """Get CRC32 of a file as a hex-encoded string, do not raise exceptions.
 
+    Args:
+        path (str): path to the file.
+        read_buf_size (int): read buffer size.
 
-def set_env_var(name: str, value: str) -> None:
-    os.environ[name] = value
-
-
-def get_env_var(name: str) -> str:
-    if name not in os.environ:
-        return ''
-    return os.environ[name]
-
-
-def unset_env_var(name: str) -> None:
-    if name in os.environ:
-        del os.environ[name]
-
-
-def env_var_exists(name: str) -> bool:
-    return name in os.environ
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# Execute shell commands
-
-# 'cmd_and_args' must be a list, each argument must be a separate list element
-def execute_shell_cmd(cmd: list):
-    # if os.name == 'nt':
-    #     result = []
-    #     process = subprocess.Popen(cmd,
-    #                             shell=True,
-    #                             stdout=subprocess.PIPE,
-    #                             stderr=subprocess.PIPE)
-    #     for line in process.stdout:
-    #         result.append(line)
-    #     errcode = process.returncode
-    #     for line in result:
-    #         print(line)
-    #     if errcode is not None:
-    #         raise Exception('cmd %s failed, see above for details', cmd)
-    # else:
-    subprocess.check_call(cmd, env=dict(os.environ))
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# Zip, tar, gzip archives
-
-def unzip_tar_gz(file: str, dest_dir: str, remove_after_extract=False) -> ResultTuple:
+    Returns:
+        Result[str, Error]:
+            Ok (str): CRC32 as a hex-encoded sting.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `TypeError`): path is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Unzip .tar.gz archive into the `dest_dir`
-    :param file: source .tar.gz archive
-    :param dest_dir: destination dir
-    :param remove_after_extract: bool
-    :return: ResultTuple: (None, ErrorMsg):
-                 ErrorMsg: empty string if success or error message otherwise;
+    crc32_result = get_file_crc32_ne(path, read_buf_size=read_buf_size)
+    if crc32_result.is_err():
+        return Err(crc32_result.unwrap_err())  # pragma: no cover
+    return Ok("%08X" % crc32_result.unwrap())
+
+
+def get_file_hash_ne(
+    path: str, *, algorithm: str, read_buf_size: int = 65536 * 2
+) -> Result[bytes, Error]:
+    """Get hash of a file as bytes, do not raise exceptions.
+
+    The returned value can easily be converted to a hex string using `.hex()` method.
+
+    Args:
+        path (str): path to the file.
+        algorithm (str): one of ("sha1", "sha256", "sha512", )
+        read_buf_size (int): read buffer size.
+
+    Returns:
+        Result[bytes, Error]:
+            Ok (bytes): hash as bytes.
+            Err (kind == `FileNotFoundError`): path does not exist.
+            Err (kind == `ValueError`): unsupported hash algorithm.
+            Err (kind == `TypeError`): path is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    if file_exists_ne(dest_dir):
-        return None, "destination is not directory: " + str(dest_dir)
-
-    if not file_exists_ne(file):
-        return None, "source file not exists"
-
-    if not dir_exists_ne(dest_dir):
-        if create_path_ne(dest_dir)[1]:
-            return None, "can't create destination directory: " + str(dest_dir)
+    validation = file_exists_ne(path)
+    if validation.is_err():  # pragma: no cover
+        # scenario already covered in one of previous tests
+        return Err(validation.unwrap_err())  # pragma: no cover
     try:
-        with tarfile.open(file, 'r:*') as t:
-            t.extractall(dest_dir)
-        if remove_after_extract:
-            remove_file_ne(file)
-    except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)}, destination dir: {str(dest_dir)}"
-    return None, ""
+        if algorithm == "sha1":
+            h = hashlib.sha1()
+        elif algorithm == "sha256":
+            h = hashlib.sha256()
+        elif algorithm == "sha512":
+            h = hashlib.sha512()
+        else:
+            return Err(
+                Error(ErrorKind.ValueError, f"unsupported hash algorithm: {algorithm}")
+            )
+        # https://stackoverflow.com/a/44873382/3824328
+        b = bytearray(read_buf_size)
+        mv = memoryview(b)
+        with open(path, "rb", buffering=0) as f:
+            for n in iter(lambda: f.readinto(mv), 0):  # type: ignore
+                h.update(mv[:n])
+        return Ok(h.digest())
+    except Exception as e:  # pragma: no cover
+        # error while doing file system operations
+        return Err(Error.from_exception(e))  # pragma: no cover
 
 
-def zip_file_tar_gz(file, dest_file, remove_after=False) -> ResultTuple:
+def gzip_file_ne(
+    src: str,
+    *,
+    dest: str,
+    arch_type: str = "gz",
+    overwrite: bool = False,
+    remove_src: bool = False,
+) -> Result[None, Error]:
+    """Create a gzip archive of specified type from the file, do not raise exceptions.
+
+    Args:
+        src (str): path to the source file.
+        dest (str): path to the output file.
+        arch_type (str): one of ("gz", "bz2").
+        overwrite (bool): silently overwrite destination if exists.
+        remove_src (bool): silently remove `src` when complete.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): operation successful.
+            Err (kind == `FileNotFoundError`): `src` path does not exist.
+            Err (kind == `ValueError`): unsupported archive type.
+            Err (kind == `TypeError`): `src` is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Create .tar.zip archive from file.
-    :param file: source file
-    :param dest_file: destination file to be written
-    :param remove_after: if True, source file will be removed after archive created
-    :return: ResultTuple: (None, ErrorMsg):
-                 ErrorMsg: empty string if success or error message otherwise;
-    """
-    if not file_exists_ne(file):
-        return None, "source file not exists: " + str(file)
+    pre_result = _pre_copy_and_move_file_operations(src, dest, overwrite=overwrite)
+    if pre_result.is_err():
+        # already covered similar case
+        return pre_result  # pragma: no cover
     try:
-        with tarfile.open(dest_file, "w:gz") as tar:
-            tar.add(file, arcname=os.path.basename(file))
-        if remove_after:
-            remove_file(file)
-    except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)} when creating file '{str(dest_file)}'"
-    return None, ""
+        mode = f"w:{arch_type}"
+        with tarfile.open(dest, mode) as tar:
+            tar.add(src, arcname=os.path.basename(src))
+        if remove_src:
+            remove_src_result = remove_file_ne(src)
+            if remove_src_result.is_err():
+                # already covered similar case: error while deleting file
+                return Err(remove_src_result.unwrap_err())  # pragma: no cover
+        return Ok(None)
+    except Exception as e:  # pragma: no cover
+        # permissions and other errors
+        return Err(Error.from_exception(e))  # pragma: no cover
 
 
-def zip_dir_tar_gz(source_dir: str, dest_file: str, remove_after=False) -> ResultTuple:
+def gzip_tree_ne(
+    src: str,
+    *,
+    dest: str,
+    arch_type: str = "gz",
+    overwrite: bool = False,
+    remove_src: bool = False,
+) -> Result[None, Error]:
+    """Create a gzip archive of specified type from the directory tree, do not raise exceptions.
+
+    Args:
+        src (str): path to the source directory.
+        dest (str): path to the output file.
+        arch_type (str): one of ("gz", "bz2").
+        overwrite (bool): silently overwrite destination if exists.
+        remove_src (bool): silently remove `src` when complete.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): operation successful.
+            Err (kind == `FileNotFoundError`): `src` path does not exist.
+            Err (kind == `ValueError`): unsupported archive type.
+            Err (kind == `TypeError`): `src` is not a file.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Create .tar.zip archive from directory tree.
-    :param source_dir:
-    :param dest_file:
-    :param remove_after: if True, source dir will be removed after archive created
-    :return: ResultTuple: (None, ErrorMsg):
-                 ErrorMsg: empty string if success or error message otherwise;
-    """
-    if not dir_exists_ne(source_dir):
-        return None, "source directory not exists: " + str(source_dir)
+    pre_result = _pre_copy_and_move_tree_operations(src, dest, overwrite=overwrite)
+    if pre_result.is_err():  # pragma: no cover
+        return pre_result
     try:
-        with tarfile.open(dest_file, "w:gz") as tar:
-            tar.add(source_dir, arcname=os.path.basename(source_dir))
-        if remove_after:
-            remove_dir_ne(source_dir)
-    except Exception as e:
-        return None, f"{e.__class__.__name__}: {str(e)} when creating file '{str(dest_file)}'"
-    return None, ""
+        mode = f"w:{arch_type}"
+        with tarfile.open(dest, mode) as tar:
+            tar.add(src, arcname=os.path.basename(src))
+        if remove_src:
+            remove_src_result = remove_dir_ne(src)
+            if remove_src_result.is_err():
+                # already covered similar case: error while deleting directory
+                return Err(remove_src_result.unwrap_err())  # pragma: no cover
+        return Ok(None)
+    except Exception as e:  # pragma: no cover
+        # permissions and other errors
+        return Err(Error.from_exception(e))  # pragma: no cover
 
 
-# ---------------------------------------------------------------------------------------------------------------------
-# File download
+def extract_gzip_archive_ne(
+    src: str, *, dest: str, overwrite: bool = False, remove_src: bool = False
+) -> Result[None, Error]:
+    """Extract a .gz or .bz2 archive contents to a directory, do not raise exceptions.
 
-def download_into_file(url, dest_file) -> ResultTuple:
+    This function will not remove `dest` directory if it exists and `overwrite=True`,
+    but its contents will be overwritten.
+
+    Args:
+        src (str): path to the source archive.
+        dest (str): path to the output directory.
+        overwrite (bool): silently overwrite destination if exists.
+        remove_src (bool): silently remove `src` when complete.
+
+    Returns:
+        Result[None, Error]:
+            Ok (None): operation successful.
+            Err (kind == `FileNotFoundError`): `src` path does not exist.
+            Err (kind == `FileExistsError`): `dest` directory already exists
+            and `overwrite=False`.
+            Err (kind == ReadError`): archive is damaged or has unsupported format.
+            Err (kind == `TypeError`): `src` is not a file or
+            `dest` is not a directory.
+            Err (kind == `PermissionError`): wrong permissions.
+            Err (kind == `...`): other error(s) occurred.
     """
-    Download url synchronously and save result into file.
-    :param url:
-    :param dest_file: file to write url contents
-    :return: Dict:
-            ["response_header"]: str - http response header if success
-            ["error"]: str - empty string if success or error message otherwise
-    :return: ResultTuple: (response_header: str, ErrorMsg):
-                 response_header: str - http response header if success
-                 ErrorMsg: empty string if success or error message otherwise;
-    """
-    response_header = ""
+    # check for src
+    src_validation = file_exists_ne(src)
+    if src_validation.is_err():
+        return Err(src_validation.unwrap_err())  # pragma: no cover
+    # check for dest
+    dest_validation = dir_exists_ne(dest)
+    if dest_validation.is_err():
+        return Err(dest_validation.unwrap_err())  # pragma: no cover
+    dest_exists = dest_validation.unwrap()
+    if not dest_exists:
+        # create path
+        dest_path_created_result = create_path_ne(dest, overwrite=overwrite)
+        if dest_path_created_result.is_err():
+            return Err(dest_path_created_result.unwrap_err())  # pragma: no cover
+    else:
+        if not overwrite:
+            return Err(
+                Error(
+                    ErrorKind.FileExistsError,
+                    f"destination directory already exists: '{dest}'",
+                )
+            )
     try:
-        response_header = urllib.request.urlretrieve(url, dest_file)[1]
-    except error.URLError as e:
-        return None, f"{e.__class__.__name__}: {str(e)}"
-    return response_header, ""
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# Git operations (simplified)
-
-def git_clone(git_url: str, path: str) -> None:
-    if dir_exists_ne(path):
-        remove_dir_ne(path)
-    cmd = ['git', 'clone', git_url, path]
-    execute_shell_cmd(cmd)
-
-
-def git_pull(path) -> None:
-    if not dir_exists_ne(path):
-        return
-    old_path = os.getcwd()
-    os.chdir(path)
-    cmd = ['git', 'pull']
-    execute_shell_cmd(cmd)
-    os.chdir(old_path)
+        with tarfile.open(src, "r:*") as t:
+            t.extractall(dest)
+        if remove_src:
+            remove_src_result = remove_file_ne(src)
+            if remove_src_result.is_err():
+                return Err(remove_src_result.unwrap_err())  # pragma: no cover
+        return Ok(None)
+    except Exception as e:  # pragma: no cover
+        # permissions and other errors
+        return Err(Error.from_exception(e))  # pragma: no cover

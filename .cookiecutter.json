@@ -1,0 +1,11 @@
+{
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "iotanbo",
+  "email": "yurizappo@gmail.com",
+  "friendly_name": "Iotanbo Python Utilities",
+  "github_user": "iotanbo",
+  "license": "MIT",
+  "package_name": "iotanbo_py_utils",
+  "project_name": "iotanbo_py_utils",
+  "version": "1.0.0"
+}

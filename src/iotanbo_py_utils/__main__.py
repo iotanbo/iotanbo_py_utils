@@ -1,16 +1,15 @@
-"""
-Entry-point module, in case you use `python -m iotanbo_py_utils`.
+"""Command-line interface."""
+import click
+
+import iotanbo_py_utils
 
 
-Why does this file exist, and why __main__? For more info, read:
+@click.command()
+@click.version_option()
+def main() -> None:
+    """Iotanbo Python Utilities."""
+    print(f"iotanbo_py_utils v{iotanbo_py_utils.__version__}")
 
-- https://www.python.org/dev/peps/pep-0338/
-- https://docs.python.org/2/using/cmdline.html#cmdoption-m
-- https://docs.python.org/3/using/cmdline.html#cmdoption-m
-"""
-import sys
-
-from iotanbo_py_utils.cli import main
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main(prog_name="iotanbo_py_utils")  # pragma: no cover

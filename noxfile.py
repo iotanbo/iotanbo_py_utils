@@ -20,7 +20,7 @@ except ImportError:
 
 
 package = "iotanbo_py_utils"
-python_versions = ["3.9"]  # "3.8",
+python_versions = ["3.8", "3.9"]
 nox.options.sessions = (
     # "pre-commit",
     # "safety",
@@ -121,7 +121,10 @@ def mypy(session: Session) -> None:
     session.install("mypy", "pytest")
     session.run("mypy", *args)
     if not session.posargs:
-        session.run("mypy", f"--python-executable={sys.executable}", "noxfile.py")
+        session.run(
+            "mypy", f"--python-executable={sys.executable}",
+            "--no-warn-unused-ignores",
+            "noxfile.py")
 
 
 @session(python=python_versions)
@@ -138,13 +141,13 @@ def tests(session: Session) -> None:
             session.notify("coverage")
 
 
-@session
+@session(python="3.9")
 def coverage(session: Session) -> None:
     """Produce the coverage report."""
     # Do not use session.posargs unless this is the only session.
     nsessions = len(
-        session._runner.manifest
-    )  # _ignore_unused type: ignore[attr-defined]
+        session._runner.manifest  # type: ignore
+    )
     has_args = session.posargs and nsessions == 1
     args = session.posargs if has_args else ["report"]
 

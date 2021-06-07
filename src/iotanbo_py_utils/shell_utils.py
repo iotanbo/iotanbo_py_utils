@@ -4,6 +4,7 @@ from subprocess import CompletedProcess
 from typing import Any
 from typing import IO
 from typing import List
+from typing import Optional
 from typing import Union
 
 from result import Err
@@ -22,14 +23,14 @@ DEVNULL = subprocess.DEVNULL
 STDOUT = subprocess.STDOUT
 
 
-def execute(cmd: str, *, timeout: Union[None, float] = None) -> Result[None, Error]:
+def execute(cmd: str, *, timeout: Optional[float] = None) -> Result[None, Error]:
     """Execute shell command, do not raise exceptions.
 
     The process' input is set to stdin, the output is set to stdout but is not captured.
 
     Args:
         cmd (str): shell command as a single string.
-        timeout (Union[None, float]): timeout in seconds (optional).
+        timeout (Optional[float]): timeout in seconds (optional).
 
     Returns:
         Result[None, Error]:
@@ -50,7 +51,7 @@ def execute(cmd: str, *, timeout: Union[None, float] = None) -> Result[None, Err
 
 
 def execute_split(
-    args: List[str], *, timeout: Union[None, float] = None
+    args: List[str], *, timeout: Optional[float] = None
 ) -> Result[None, Error]:
     """Execute shell command with arguments that is a list of strings, do not raise exceptions.
 
@@ -59,7 +60,7 @@ def execute_split(
 
     Args:
         args (List[str]): shell command as a single string.
-        timeout (Union[None, float]): timeout in seconds (optional).
+        timeout (Optional[float]): timeout in seconds (optional).
 
     Returns:
         Result[None, Error]:
@@ -85,7 +86,7 @@ def execute_split(
 def execute_extended(
     cmd: str,
     *,
-    timeout: Union[None, float] = None,
+    timeout: Optional[float] = None,
     stdin: STREAMTYPE = PIPE,
     stdout: STREAMTYPE = PIPE,
     stderr: STREAMTYPE = PIPE,
@@ -101,7 +102,7 @@ def execute_extended(
 
     Args:
         cmd (str): shell command as a single string.
-        timeout (Union[None, float]): timeout in seconds (optional).
+        timeout (Optional[float]): timeout in seconds (optional).
         stdin (STREAMTYPE): one of (DEVNULL, PIPE, or output of another `CompletedProcess`).
         stdout (STREAMTYPE): one of (DEVNULL, PIPE).
         stderr (STREAMTYPE): one of (DEVNULL, PIPE or STDOUT to redirect stderr output to stdout).

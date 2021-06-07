@@ -169,7 +169,7 @@ class Error:
     def from_exception(
         cls: Type[ErrorType], e: AnyException, *, new_kind: str = ""
     ) -> ErrorType:
-        """Creates an Error object from the specified exception.
+        """Create an Error object from the specified exception.
 
         If `new_kind` specified, its value will be assigned to the error's `kind`,
         and the exception's name will be assigned to `cause`.
@@ -178,7 +178,7 @@ class Error:
         to `kind`, and the `cause` will be left empty.
 
         Args:
-            e (AnyException): an arbitrary exception that is subclass of `Exception`.
+            e (AnyException): an arbitrary exception that is a subclass of `Exception`.
             new_kind (str): error kind to replace the exception's name if required;
                 it may be one of `iotanbo_py_utils.error.ErrorKind` or custom string.
 

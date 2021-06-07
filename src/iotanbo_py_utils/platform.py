@@ -1,4 +1,5 @@
 """Platform utilities."""
+
 import sys
 
 

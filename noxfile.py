@@ -20,7 +20,7 @@ except ImportError:
 
 
 package = "iotanbo_py_utils"
-python_versions = ["3.9"]  # "3.8",
+python_versions = ["3.8", "3.9"]
 nox.options.sessions = (
     # "pre-commit",
     # "safety",

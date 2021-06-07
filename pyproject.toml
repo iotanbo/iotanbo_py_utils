@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "iotanbo_py_utils"
-version = "0.9.0"
+version = "0.9.1"
 description = "Python utilities by iotanbo"
 authors = ["iotanbo <yurizappo@gmail.com>"]
 license = "MIT"

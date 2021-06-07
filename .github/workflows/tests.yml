@@ -9,15 +9,13 @@ jobs:
     name: ${{ matrix.session }} ${{ matrix.python-version }} / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - { python-version: 3.9, os: ubuntu-latest, session: "mypy" }
           - { python-version: 3.8, os: ubuntu-latest, session: "mypy" }
           - { python-version: 3.9, os: ubuntu-latest, session: "tests" }
           - { python-version: 3.8, os: ubuntu-latest, session: "tests" }
-          #          - { python-version: 3.9, os: windows-latest, session: "tests" }
-          #          - { python-version: 3.9, os: macos-latest, session: "tests" }
           - { python-version: 3.9, os: ubuntu-latest, session: "typeguard" }
 
     env:

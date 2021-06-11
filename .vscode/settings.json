@@ -7,6 +7,7 @@
     "PYEVN",
     "Popen",
     "UNEXP",
+    "autobuild",
     "chdir",
     "codecov",
     "cpplibhub",
@@ -15,6 +16,7 @@
     "fsize",
     "hashlib",
     "hexdigest",
+    "iotanbo",
     "isclose",
     "libbz",
     "libffi",
@@ -34,6 +36,7 @@
     "nsessions",
     "ntpath",
     "optionxform",
+    "pathvalidate",
     "posargs",
     "pyenv",
     "pylint",
@@ -50,11 +53,12 @@
     "virtualenvs",
     "xdoctest"
   ],
-  "python.pythonPath": "/home/iotanbo/.cache/pypoetry/virtualenvs/iotanbo-py-utils-Keoa2cTC-py3.8/bin/python",
+  "python.pythonPath": "/Users/sugurd/Library/Caches/pypoetry/virtualenvs/iotanbo-py-utils-U9_HkfGt-py3.8",
   "python.testing.pytestArgs": ["tests"],
   "python.testing.unittestEnabled": false,
   "python.testing.nosetestsEnabled": false,
   "python.testing.pytestEnabled": true,
   "python.linting.flake8Enabled": true,
-  "python.linting.enabled": true
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false
 }

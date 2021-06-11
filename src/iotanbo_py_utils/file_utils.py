@@ -150,8 +150,16 @@ def create_path_ne(path: str, *, overwrite: bool = False) -> Result[None, Error]
                     # remove existing directory and its contents
                     shutil.rmtree(path)
         os.makedirs(path)
+    except PermissionError as e:  # pragma: no cover
+        # This is covered on linux only
+        return Err(Error.from_exception(e))  # pragma: no cover
     except Exception as e:
-        return Err(Error.from_exception(e))
+        if sys.platform == "darwin":
+            # on macOS, OSError is raised instead of PermissionError
+            # This is covered on macOS only
+            if e.__class__.__name__ == 'OSError':  # pragma: no cover
+                return Err(Error.from_exception(e, new_kind=ErrorKind.PermissionError))  # pragma: no cover
+        return Err(Error.from_exception(e))  # pragma: no cover
     return Ok(None)
 
 
@@ -215,8 +223,9 @@ def create_symlink_ne(
                     # remove dest symlink
                     os.unlink(dest)
         os.symlink(src, dest)
-    except Exception as e:
-        return Err(Error.from_exception(e))
+    except Exception as e:  # pragma: no cover
+        # Covered on linux only
+        return Err(Error.from_exception(e))  # pragma: no cover
     return Ok(None)
 
 

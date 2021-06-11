@@ -1,5 +1,6 @@
 """Test `file_utils.py`."""
 import os
+import sys
 
 import pytest
 
@@ -380,13 +381,16 @@ def test_os_symlink(existing_dir: str, existing_text_file: str) -> None:
     with pytest.raises(FileNotFoundError):
         os.symlink(existing_text_file, INVALID_PATH)
 
-    symlink_dest = join(existing_dir, "symlink_dest")
-    with pytest.raises(FileNotFoundError):
-        os.symlink(INVALID_PATH, symlink_dest)
+    # Strangely, macOS allows creating symlinks to empty and invalid paths
+    if sys.platform == "linux":
+        symlink_dest = join(existing_dir, "symlink_dest")
+        with pytest.raises(FileNotFoundError):
+            os.symlink(INVALID_PATH, symlink_dest)
 
-    symlink_to_empty = join(existing_dir, "symlink_to_empty")
-    with pytest.raises(FileNotFoundError):
-        os.symlink("", symlink_to_empty)
+    if sys.platform == "linux":
+        symlink_to_empty = join(existing_dir, "symlink_to_empty")
+        with pytest.raises(FileNotFoundError):
+            os.symlink("", symlink_to_empty)
 
 
 def test_read_write_text_file_ne(existing_dir: str) -> None:

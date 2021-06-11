@@ -1,5 +1,4 @@
 """Errors and exceptions used by the `iotanbo_py_utils` package."""
-from dataclasses import dataclass
 from typing import Type
 from typing import TypeVar
 
@@ -145,13 +144,8 @@ ErrorType = TypeVar("ErrorType", bound="Error")
 AnyException = TypeVar("AnyException", bound="Exception")
 
 
-@dataclass
 class Error:
     """An error object."""
-
-    kind: str
-    msg: str
-    cause: str
 
     def __init__(self, kind: str, msg: str = "", *, cause: str = ""):
         """Create a new Error object.
